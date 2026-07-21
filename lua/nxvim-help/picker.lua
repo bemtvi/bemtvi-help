@@ -29,10 +29,17 @@ local function anchor_row(text, tag)
   return n + 1
 end
 
--- Stream every known tag as a picker item. `text` is the tag (what the matcher sees
--- and shows); `entry` carries its index entry for confirm; `path`/`row`/`col` drive the
--- "location" preview (the file scrolled to the tag's anchor). Sorted for a stable list.
--- Async: builds the index, then reads each doc file once to locate its anchors.
+-- The help file's basename, the second (aligned) picker column — e.g.
+-- `/…/doc/nxvim-help.txt` -> `nxvim-help.txt`.
+local function help_file(path)
+  return path:match("([^/]+)$") or path
+end
+
+-- Stream every known tag as a picker item. `text` is `tag  file` — the tag padded to
+-- a fixed width so the file column lines up (the matcher sees both, so you can also
+-- narrow by help file); `entry` carries its index entry for confirm; `path`/`row`/`col`
+-- drive the "location" preview (the file scrolled to the tag's anchor). Sorted for a
+-- stable list. Async: builds the index, then reads each doc file once to locate anchors.
 function M.items(ctx)
   return nx.async(function()
     local idx = nx.await(index.ensure())
@@ -41,6 +48,13 @@ function M.items(ctx)
       tags[#tags + 1] = tag
     end
     table.sort(tags)
+    -- Pad the tag column to the longest tag actually present, capped at 48 so one
+    -- outlier tag can't push the file column off the right; past the cap it wraps.
+    local width = 0
+    for _, tag in ipairs(tags) do
+      width = math.max(width, #tag)
+    end
+    width = math.min(width, 48)
     -- Read each file at most once; many tags share one file.
     local cache = {}
     local function text_of(file)
@@ -53,7 +67,7 @@ function M.items(ctx)
     for _, tag in ipairs(tags) do
       local entry = idx[tag]
       ctx.push({
-        text = tag,
+        text = string.format("%-" .. width .. "s  %s", tag, help_file(entry.file)),
         entry = entry,
         path = entry.file,
         row = anchor_row(text_of(entry.file), tag),

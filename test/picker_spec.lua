@@ -34,14 +34,17 @@ nx.test.describe("nxvim-help picker", function()
     local texts, found = {}, nil
     for _, it in ipairs(items) do
       texts[#texts + 1] = it.text
-      if it.text == "nxvim-help-usage" then
+      if it.entry.name == "nxvim-help-usage" then
         found = it
       end
     end
     -- the known topic is present and carries a resolvable entry
     nx.test.expect(found).to_be_truthy()
     nx.test.expect(found.entry.name).to_be("nxvim-help-usage")
-    -- sorted ascending
+    -- the display text is `tag  file`: starts with the tag, ends with the help file
+    nx.test.expect(found.text:sub(1, #"nxvim-help-usage")).to_be("nxvim-help-usage")
+    nx.test.expect(found.text).to_contain(found.entry.file:match("([^/]+)$"))
+    -- sorted ascending (the fixed-width tag padding preserves tag order)
     for i = 2, #texts do
       nx.test.expect(texts[i - 1] <= texts[i]).to_be_truthy()
     end
