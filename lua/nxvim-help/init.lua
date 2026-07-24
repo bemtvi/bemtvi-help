@@ -101,6 +101,9 @@ local registered = false
 -- later setup{...} still takes effect: registration is one-time, opts are not.
 --   opts.keywordprg = true  → map `K` (normal mode) to help for the word under the
 --   cursor. Off by default so it doesn't clobber an LSP-hover `K`.
+--   opts.search_keymap      → the normal-mode map that opens the help-topic picker
+--   (the bare `:help` search). Defaults to `<leader>fh`; a string sets a different
+--   lhs, `false` disables it.
 function M.setup(opts)
   opts = opts or {}
 
@@ -108,6 +111,19 @@ function M.setup(opts)
     nx.keymap.set("n", "K", function()
       M.help_cword()
     end, { desc = "Help for the word under the cursor" })
+  end
+
+  -- <leader>fh opens the topic picker — "find help", the bare `:help` search. On by
+  -- default (a leader map rarely collides); pass `search_keymap = false` to skip it,
+  -- or a string to bind a different key.
+  local search_lhs = opts.search_keymap
+  if search_lhs == nil then
+    search_lhs = "<leader>fh"
+  end
+  if search_lhs then
+    nx.keymap.set("n", search_lhs, function()
+      M.help("")
+    end, { desc = "Search help topics" })
   end
 
   if registered then

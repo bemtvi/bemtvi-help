@@ -49,6 +49,9 @@ target doc scrolled to the topic's tag. Each row shows the tag and, in an aligne
 the help file it lives in. Type to filter, `CTRL-N` / `CTRL-P` to move, `<CR>` to open, `<Esc>`
 to cancel.
 
+`<leader>fh` ("find help") opens this same picker from normal mode — the keymap equivalent of a
+bare `:help`. It is on by default; see Setup to rebind or disable it.
+
 # Registering help
 
 There is no registration API. Any plugin that ships a `doc/` directory is discovered
@@ -93,6 +96,10 @@ require("nxvim-help").setup({
   -- Map `K` (normal mode) to help for the word under the cursor.
   -- Off by default so it doesn't clobber an LSP-hover `K`.
   keywordprg = true,
+
+  -- The normal-mode map that opens the help-topic picker (the bare `:help`
+  -- search). Defaults to "<leader>fh"; a string rebinds it, `false` disables it.
+  search_keymap = "<leader>fh",
 })
 ```
 

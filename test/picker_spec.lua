@@ -88,4 +88,17 @@ nx.test.describe("nxvim-help picker", function()
     -- the picker is opened with a location preview pane
     nx.test.expect(nx._picker.preview).to_be("location")
   end)
+
+  nx.test.it("<leader>fh opens the topic picker (help search)", function(t)
+    -- setup() binds <leader>fh to the picker (bare :help). Rebind under a known
+    -- leader so we can drive it, then feed the sequence.
+    vim.g.mapleader = ","
+    help.setup()
+    t:feed(",fh")
+    t:wait_for(function()
+      return nx._picker ~= nil
+    end)
+    nx.test.expect(nx._picker ~= nil).to_be_truthy()
+    t:feed("<Esc>") -- dismiss the picker
+  end)
 end)

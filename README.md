@@ -9,6 +9,7 @@ the promise `nx.fs` API.
 ```
 :help                  fuzzy-find a topic (the picker)
 :help nxvim-help       open help for a topic  (`:h` is the abbreviation)
+<leader>fh             open the topic picker ("find help") — bare :help
 CTRL-] / <CR>          (in help) follow the tag under the cursor
 CTRL-T                 (in help) jump back along the tag stack
 q                      (in the help window) close it
