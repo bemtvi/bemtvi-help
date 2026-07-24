@@ -1,5 +1,4 @@
 *nxvim-help.txt*                                     Vim-style :help for nxvim
-                                                                     For nxvim
 
 ==============================================================================
 Table of Contents                               *nxvim-help-table-of-contents*

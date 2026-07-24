@@ -54,10 +54,10 @@ bash "$CACHE/panvimdoc.sh" \
 # prose). Em dash (—) and ellipsis (…) are intentional and left as-is.
 sed -i "s/\xe2\x80\x99/'/g; s/\xe2\x80\x98/'/g; s/\xe2\x80\x9c/\"/g; s/\xe2\x80\x9d/\"/g" "$OUTPUT"
 
-# panvimdoc stamps today's date on the header's second line ("Last change: …"),
-# which is non-deterministic and would fail a freshness check the next day.
-# Replace it with a stable, right-aligned header so the output is reproducible.
-printf -v HEADER2 '%78s' 'For nxvim'
-sed -i "2s/.*/$HEADER2/" "$OUTPUT"
+# panvimdoc's second header line is "For <version>    Last change: <date>". The
+# date is non-deterministic (a freshness check would fail the next day) and the
+# "For nxvim" half just restates the description on line 1, so drop the line
+# entirely — the output is then reproducible and doesn't say "nxvim" twice.
+sed -i '2d' "$OUTPUT"
 
 echo "done: $OUTPUT"
