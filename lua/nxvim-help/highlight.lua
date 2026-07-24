@@ -66,16 +66,62 @@ function M.apply(buf, lines, code)
   end
 end
 
+-- Priority for the per-language token marks, above the flat `nxHelpCode` base so a
+-- `>lua` block's real lua tokens (keyword, string, …) paint over the flat colour on
+-- the cells they cover; the un-captured cells keep the flat code colour. Extmarks
+-- default to priority 4096 (as `nxHelpCode` does), so the tokens sit just above it.
+local TOKEN_PRIORITY = 4200
+
+-- Overlay per-language syntax highlighting on each fenced code block's body, the way
+-- neovim's tree-sitter injection colours a `>lua` example. For every block that names
+-- a language, the body text is highlighted via `nx.treesitter.highlight` (the native
+-- off-buffer highlighter) and each returned span placed as an extmark over the block's
+-- rows — displayed text equals the raw text on code rows (only fence *markers* are
+-- concealed), so a span's byte columns are the extmark columns directly. Async (the
+-- highlight is a promise); a language with no installed grammar returns no spans, so
+-- the block simply keeps its flat `nxHelpCode` colour. Returns a promise.
+function M.apply_tokens(buf, lines, blocks)
+  return nx.async(function()
+    for _, b in ipairs(blocks or {}) do
+      if b.lang and b.lang ~= "" and b.first then
+        local body = {}
+        for r = b.first, b.last do
+          body[#body + 1] = lines[r + 1]
+        end
+        local spans = nx.await(nx.treesitter.highlight(b.lang, table.concat(body, "\n")))
+        for _, sp in ipairs(spans) do
+          if sp.col_end > sp.col_start then
+            -- The engine reports tree-sitter capture names (`keyword`, `function.call`);
+            -- the `@`-prefixed group is what a colorscheme styles.
+            nx.buf.set_extmark(buf, M.ns, b.first + sp.line, sp.col_start, {
+              end_row = b.first + sp.line,
+              end_col = sp.col_end,
+              hl_group = "@" .. sp.group,
+              priority = TOKEN_PRIORITY,
+            })
+          end
+        end
+      end
+    end
+  end)()
+end
+
 -- Apply to a view's buffer once it exists. The backing buffer arrives via the mirror
 -- a tick after the view is created, so the first show must wait for it (nx.wait_for
--- returns at once when it's already known). Returns a promise.
-function M.apply_to_view(view, lines, code)
+-- returns at once when it's already known). Places the base marks synchronously, then
+-- overlays the per-language code-block tokens (async, off the base paint). Returns a
+-- promise (settled once the base marks are placed and the token overlay is kicked off).
+function M.apply_to_view(view, lines, code, blocks)
   return nx.async(function()
     local buf = view:bufnr()
       or nx.await(nx.wait_for(function()
         return view:bufnr()
       end, { tries = 100, interval = 5, message = "help buffer never appeared" }))
     M.apply(buf, lines, code)
+    -- Don't block the show on the token overlay; surface a failure rather than swallow.
+    M.apply_tokens(buf, lines, blocks):catch(function(e)
+      nx.notify("nxvim-help: code highlight failed: " .. tostring(e), 3)
+    end)
   end)()
 end
 

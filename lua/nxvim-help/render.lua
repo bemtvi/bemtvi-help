@@ -16,33 +16,57 @@
 
 local M = {}
 
--- If `line` is a code-fence START, return it with the trailing `>`/`>lang` marker
--- removed; otherwise nil. The marker is the last `>` followed only by `[a-z0-9]` to the
--- end of the line, provided that `>` sits at column 1 or just after a space (vim's
--- `\%(^\| \)` prefix). The preceding space is stripped with it (vim conceals ` >`).
+-- If `line` is a code-fence START, return `(stripped, lang)` — the line with the
+-- trailing `>`/`>lang` marker removed, plus the fence language (`"lua"` for `>lua`,
+-- `""` for a bare `>`); otherwise nil. The marker is the last `>` followed only by
+-- `[a-z0-9]` to the end of the line, provided that `>` sits at column 1 or just after
+-- a space (vim's `\%(^\| \)` prefix). The preceding space is stripped with it (vim
+-- conceals ` >`). `lang` drives the per-language token highlighting of the block body.
 function M.strip_start(line)
   local s = line:find(">[%l%d]*$")
   if not s then
     return nil
   end
+  local lang = line:sub(s + 1) -- "" for a bare `>`
   if s == 1 then
-    return "" -- a bare `>` / `>lua` line collapses to blank
+    return "", lang -- a bare `>` / `>lua` line collapses to blank
   end
   if line:sub(s - 1, s - 1) == " " then
-    return line:sub(1, s - 2)
+    return line:sub(1, s - 2), lang
   end
   return nil -- `>` mid-token (e.g. `a=>b`) is prose, not a fence
 end
 
 -- Prepare `raw` (the file split into lines) for display. Returns
---   { lines = <rendered lines>, code = { [row0] = true, … } }
--- where `code` flags the 0-based rows that are fenced example content (for the code
--- highlight). Fence markers are concealed in `lines`; every input line maps to exactly
--- one output line, so `#lines == #raw`.
+--   { lines = <rendered lines>, code = { [row0] = true, … },
+--     blocks = { { lang = <string>, first = <row0>, last = <row0> }, … } }
+-- where `code` flags the 0-based rows that are fenced example content (for the flat
+-- code highlight) and `blocks` describes each fenced example (its language and its
+-- 0-based inclusive body-row range) for the per-language token overlay. Fence markers
+-- are concealed in `lines`; every input line maps to exactly one output line, so
+-- `#lines == #raw`.
 function M.prepare(raw)
   local lines = {}
   local code = {}
+  local blocks = {}
   local in_block = false
+  local cur = nil -- the open block's { lang, first, last } (nil between blocks)
+  -- Close the open block, recording it only if it had at least one body row (a `>`
+  -- immediately followed by `<` has no body and needs no token overlay).
+  local function close()
+    if cur and cur.first then
+      blocks[#blocks + 1] = cur
+    end
+    cur = nil
+  end
+  -- Note a fenced-example body row on the open block (extends its row range).
+  local function mark_body(row)
+    code[row] = true
+    if cur then
+      cur.first = cur.first or row
+      cur.last = row
+    end
+  end
   for i = 1, #raw do
     local line = raw[i]
     local row = i - 1
@@ -51,24 +75,29 @@ function M.prepare(raw)
         -- Closing marker: drop the leading `<`; the rest of the line is normal prose.
         lines[i] = line:sub(2)
         in_block = false
+        close()
       elseif line ~= "" and not line:find("^[ \t]") then
         -- A non-blank line starting in column 1 ends the block *before* itself; this
         -- line is prose (and may itself open the next fence).
-        local opened = M.strip_start(line)
+        close()
+        local opened, lang = M.strip_start(line)
         lines[i] = opened or line
         in_block = opened ~= nil
+        cur = in_block and { lang = lang } or nil
       else
         -- Indented or blank: example content.
         lines[i] = line
-        code[row] = true
+        mark_body(row)
       end
     else
-      local opened = M.strip_start(line)
+      local opened, lang = M.strip_start(line)
       lines[i] = opened or line
       in_block = opened ~= nil
+      cur = in_block and { lang = lang } or nil
     end
   end
-  return { lines = lines, code = code }
+  close() -- an unclosed block running to end-of-file
+  return { lines = lines, code = code, blocks = blocks }
 end
 
 return M

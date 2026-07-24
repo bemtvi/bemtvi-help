@@ -82,7 +82,7 @@ function M.show(entry, line, col)
     current = entry
     -- Syntax highlighting (cosmetic): apply once the backing buffer exists. Don't
     -- block the show on it; surface a failure rather than swallowing it.
-    highlight.apply_to_view(view, lines, rendered.code):catch(function(e)
+    highlight.apply_to_view(view, lines, rendered.code, rendered.blocks):catch(function(e)
       nx.notify(
         "nxvim-help: highlight failed: " .. tostring(type(e) == "table" and e.message or e),
         4

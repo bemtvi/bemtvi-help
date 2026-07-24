@@ -92,6 +92,63 @@ nx.test.describe("nxvim-help highlight", function()
     nx.test.expect(groups["nxHelpCodeBlock"]).to_be_truthy()
   end)
 
+  nx.test.it("token-highlights a >lua block body by its fence language", function(t)
+    -- Needs the `lua` tree-sitter grammar installed; the off-buffer highlighter
+    -- returns nothing without it, so skip rather than fail (the external-dependency
+    -- convention). The probe doubles as proof the API is wired.
+    local probe = nx.await(nx.treesitter.highlight("lua", "local x = 1\n"))
+    if #probe == 0 then
+      return
+    end
+    local dir = nx.test.tempdir()
+    local file = dir .. "/topic.txt"
+    nx.await(nx.fs.write(
+      file,
+      table.concat({
+        "*topic*  A topic.",
+        "",
+        "Use it like this: >lua",
+        "  local y = require('mod')",
+        "<Back to prose.",
+      }, "\n")
+    ))
+    window.show({ file = file, name = "topic" })
+    local buf = t:wait_for(function()
+      return window.bufnr()
+    end)
+
+    -- The `local` keyword on the code row (0-based 3) carries a `@keyword` extmark —
+    -- a group that can ONLY come from the injected lua highlighter, never the plugin's
+    -- flat `nxHelpCode`. Async (the overlay awaits the highlight promise), so poll.
+    local kw = t:wait_for(function()
+      for _, mk in ipairs(nx.buf.extmarks(buf, highlight.ns, 0, -1, { details = true })) do
+        if mk[2] == 3 and mk[4] and mk[4].hl_group == "@keyword" then
+          -- `local` starts at byte column 2 (two-space indent).
+          return mk[3] == 2 and mk
+        end
+      end
+      return nil
+    end)
+    nx.test.expect(kw).to_be_truthy()
+
+    -- The flat code base and block background survive under the tokens (the code row
+    -- keeps `nxHelpCode` / `nxHelpCodeBlock` — the token overlay only adds marks).
+    local groups = {}
+    for _, mk in ipairs(nx.buf.extmarks(buf, highlight.ns, 0, -1, { details = true })) do
+      if mk[2] == 3 then
+        local d = mk[4] or {}
+        if d.hl_group then
+          groups[d.hl_group] = true
+        end
+        if d.line_hl_group then
+          groups[d.line_hl_group] = true
+        end
+      end
+    end
+    nx.test.expect(groups["nxHelpCode"]).to_be_truthy()
+    nx.test.expect(groups["nxHelpCodeBlock"]).to_be_truthy()
+  end)
+
   nx.test.it("marks a *target* span at its exact byte columns", function(t)
     help.help("nxvim-help")
     local buf = t:wait_for(function()
