@@ -51,6 +51,30 @@ nx.test.describe("nxvim-help.render", function()
     nx.test.expect(r.code[5]).to_be_nil()
   end)
 
+  nx.test.it("strips a block's common indentation, keeping relative indent", function()
+    -- panvimdoc indents every `>` body line by 4 spaces; we dedent by the block's
+    -- own minimum so the code sits flush against the block's left edge while its
+    -- internal (relative) indentation survives. Blank body rows stay blank.
+    local raw = split(table.concat({
+      "Example: >lua", -- row 0  opening fence -> "Example:"
+      "    require('x').setup({", -- row 1  common 4-space indent
+      "      opt = true,", -- row 2  6 spaces (2 nested)
+      "", -- row 3  blank inside the block
+      "    })", -- row 4  4 spaces
+      "<done", -- row 5  closing fence -> "done"
+    }, "\n"))
+    local r = render.prepare(raw)
+    nx.test.expect(r.lines[1]).to_be("Example:") -- opening prose
+    nx.test.expect(r.lines[2]).to_be("require('x').setup({") -- common 4 stripped
+    nx.test.expect(r.lines[3]).to_be("  opt = true,") -- relative 2 kept
+    nx.test.expect(r.lines[4]).to_be("") -- blank stays blank
+    nx.test.expect(r.lines[5]).to_be("})") -- common 4 stripped
+    nx.test.expect(r.lines[6]).to_be("done") -- closing prose
+    -- still flagged as code rows
+    nx.test.expect(r.code[1]).to_be_truthy()
+    nx.test.expect(r.code[4]).to_be_truthy()
+  end)
+
   nx.test.it("ends an unclosed block at the next column-1 line", function()
     local raw = split(table.concat({
       "Header: >", -- row 0  opening fence

@@ -177,8 +177,9 @@ nx.test.describe("nxvim-help highlight", function()
     local kw = t:wait_for(function()
       for _, mk in ipairs(nx.buf.extmarks(buf, highlight.ns, 0, -1, { details = true })) do
         if mk[2] == 3 and mk[4] and mk[4].hl_group == "@keyword" then
-          -- `local` starts at byte column 2 (two-space indent).
-          return mk[3] == 2 and mk
+          -- `local` starts at byte column 0: render.prepare dedents the block's
+          -- common (two-space) indent, so the code sits flush at the left.
+          return mk[3] == 0 and mk
         end
       end
       return nil

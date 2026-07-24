@@ -97,6 +97,29 @@ function M.prepare(raw)
     end
   end
   close() -- an unclosed block running to end-of-file
+
+  -- Dedent each fenced block by its own common leading indentation, so the code
+  -- sits flush against the block's left edge (it renders on its own background)
+  -- rather than at vim's fixed example indent — panvimdoc prefixes every `>` body
+  -- line with 4 spaces. Relative indentation within the block is preserved (we
+  -- strip the block MINIMUM, computed over lines that have real content), and blank
+  -- rows stay blank. Only code-body columns shift; tags/links are never scanned on
+  -- code rows, so anchor addressing is unaffected (and line count is untouched).
+  for _, b in ipairs(blocks) do
+    local min
+    for row = b.first, b.last do
+      local ws, rest = lines[row + 1]:match("^([ \t]*)(.*)$")
+      if rest ~= "" and (not min or #ws < min) then
+        min = #ws
+      end
+    end
+    if min and min > 0 then
+      for row = b.first, b.last do
+        lines[row + 1] = lines[row + 1]:sub(min + 1)
+      end
+    end
+  end
+
   return { lines = lines, code = code, blocks = blocks }
 end
 
