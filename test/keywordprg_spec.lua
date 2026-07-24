@@ -31,9 +31,11 @@ nx.test.describe("nxvim-help keywordprg (K)", function()
         return nil
       end
       local s = buf_text(b)
-      return s:find("USAGE", 1, true) and s
+      -- Assert on the structural tag the topic resolves to, not the rendered
+      -- header casing (which is a doc-presentation detail, not this behavior).
+      return s:find("nxvim-help-usage", 1, true) and s
     end)
-    nx.test.expect(txt).to_contain("USAGE")
+    nx.test.expect(txt).to_contain("nxvim-help-usage")
   end)
 
   nx.test.it("help_cword with no word under the cursor opens nothing", function(t)

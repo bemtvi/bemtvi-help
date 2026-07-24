@@ -50,7 +50,8 @@ nx.test.describe("nxvim-help window", function()
     -- Drive the real :help command: core defers it, the server sees the plugin's
     -- user command is registered, and runs it (the installed-plugin path).
     t:feed(":help nxvim-help-usage<CR>")
-    wait_contains(t, "USAGE")
+    -- Wait on the resolved tag, not the rendered header casing.
+    wait_contains(t, "nxvim-help-usage")
     -- the cursor settles on the anchor line a tick later
     local line = t:wait_for(function()
       return window.line()
@@ -61,6 +62,6 @@ nx.test.describe("nxvim-help window", function()
 
   nx.test.it("prefix-resolves a partial topic", function(t)
     help.help("nxvim-help-reg")
-    nx.test.expect(wait_contains(t, "REGISTERING")).to_contain("REGISTERING")
+    nx.test.expect(wait_contains(t, "nxvim-help-registering")).to_contain("nxvim-help-registering")
   end)
 end)

@@ -67,9 +67,10 @@ nx.test.describe("nxvim-help picker", function()
         return nil
       end
       local s = table.concat(nx.buf.lines(b, 0, -1, false), "\n")
-      return s:find("USAGE", 1, true) and s
+      -- Assert on the resolved tag, not the rendered header casing.
+      return s:find("nxvim-help-usage", 1, true) and s
     end)
-    nx.test.expect(txt).to_contain("USAGE")
+    nx.test.expect(txt).to_contain("nxvim-help-usage")
   end)
 
   nx.test.it("bare :help opens the topic picker", function(t)

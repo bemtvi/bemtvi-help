@@ -32,12 +32,13 @@ nx.test.describe("nxvim-help window lifecycle", function()
 
   nx.test.it("reopens after the help window is closed with :q", function(t)
     help.help("nxvim-help")
-    shows(t, "NXVIM HELP")
+    -- Wait on the resolved tag (intro page), not the rendered header text.
+    shows(t, "nxvim-help-intro")
     -- the help window is focused after show; close it like the user
     t:feed(":q<CR>")
     -- opening another topic must reshow (remount), not focus a closed window
     help.help("nxvim-help-usage")
-    nx.test.expect(shows(t, "USAGE")).to_contain("USAGE")
+    nx.test.expect(shows(t, "nxvim-help-usage")).to_contain("nxvim-help-usage")
   end)
 
   nx.test.it("recovers (no panic) after the help buffer is :bd-deleted", function(t)
@@ -49,6 +50,6 @@ nx.test.describe("nxvim-help window lifecycle", function()
     t:feed(":bd! " .. buf .. "<CR>") -- delete the hidden help buffer
     -- the next open must not panic and must show (the handle is recreated)
     help.help("nxvim-help-usage")
-    nx.test.expect(shows(t, "USAGE")).to_contain("USAGE")
+    nx.test.expect(shows(t, "nxvim-help-usage")).to_contain("nxvim-help-usage")
   end)
 end)
