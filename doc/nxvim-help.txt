@@ -12,6 +12,7 @@ Table of Contents                               *nxvim-help-table-of-contents*
 7. Setup                                                    |nxvim-help-setup|
 8. Highlighting                                      |nxvim-help-highlighting|
 9. Notes                                                    |nxvim-help-notes|
+
 Vim-style `:help` for nxvim — an optional first-party plugin built entirely
 on the native `nx.*` plugin API (ADR 0002
 <https://github.com/davidrios/nxvim>): no core changes and no buffer-mutation
