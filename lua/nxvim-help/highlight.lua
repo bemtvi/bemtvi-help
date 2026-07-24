@@ -53,10 +53,16 @@ function M.apply(buf, lines, code)
       if line:find("^==+") or line:find("^%-%-%-+") then
         mark(buf, row, 1, #line, "nxHelpDelim")
       else
-        -- A leading run of UPPERCASE words is a section headline ("NXVIM HELP").
-        local hs, he = line:find("^[A-Z][A-Z0-9 ]*[A-Z0-9]")
-        if hs then
-          mark(buf, row, hs, he, "nxHelpHeadline")
+        -- A section heading, keyed on the vimdoc STRUCTURE rather than an ALL-CAPS
+        -- run: text at column 1 followed by a right-aligned *tag* at end of line
+        -- ("Table of Contents  *…*", "1. Commands  *…*", "SUBSECTION  *…*"), or an
+        -- H3-style "TITLE ~". Structure, not caps, because panvimdoc titles are
+        -- numbered / mixed-case, and a caps run in prose (e.g. a line opening with
+        -- "LSP") is not a heading. Table-of-contents ENTRIES end in `|link|`, not a
+        -- tag, so they are correctly excluded.
+        local htext = line:match("^(%S.-)%s%s+%*[^\t]+%*%s*$") or line:match("^(%S.-) ~$")
+        if htext then
+          mark(buf, row, 1, #htext, "nxHelpHeadline")
         end
       end
       scan(buf, row, line, '%*[^ \t*"]+%*', "nxHelpTag")

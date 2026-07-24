@@ -45,6 +45,60 @@ nx.test.describe("nxvim-help highlight", function()
     nx.test.expect(groups["nxHelpDelim"]).to_be_truthy()
   end)
 
+  nx.test.it("marks structural headings (tagged / ~) but not ALL-CAPS prose", function(t)
+    -- panvimdoc headings are numbered / mixed-case with a right-aligned *tag*
+    -- ("1. Commands  *topic-commands*", "Table of Contents  *topic-toc*"), or an
+    -- H3-style "TITLE ~". A caps run in PROSE ("LSP-hover …") is NOT a heading —
+    -- the old ALL-CAPS heuristic wrongly flagged it and missed the real headings.
+    local dir = nx.test.tempdir()
+    local file = dir .. "/topic.txt"
+    nx.await(nx.fs.write(
+      file,
+      table.concat({
+        "*topic.txt*  A topic.", -- row 0: title line (not a section heading)
+        "", -- 1
+        "==============================================================================", -- 2: delim
+        "Table of Contents                                          *topic-toc*", -- 3: heading
+        "", -- 4
+        "1. Commands                                           *topic-commands*", -- 5: heading
+        "", -- 6
+        "SUBSECTION ~", -- 7: H3-style heading
+        "", -- 8
+        "LSP-hover K stays out of the way by default.", -- 9: caps PROSE, not a heading
+      }, "\n")
+    ))
+    window.show({ file = file, name = "topic" })
+    local buf = t:wait_for(function()
+      return window.bufnr()
+    end)
+
+    -- Rows carrying each group (wait until highlighting has landed).
+    local by_row = t:wait_for(function()
+      local rows, any = {}, false
+      for _, mk in ipairs(nx.buf.extmarks(buf, highlight.ns, 0, -1, { details = true })) do
+        local g = mk[4] and mk[4].hl_group
+        if g then
+          rows[mk[2]] = rows[mk[2]] or {}
+          rows[mk[2]][g] = true
+          any = true
+        end
+      end
+      return any and rows
+    end)
+    local function has(row, group)
+      return (by_row[row] and by_row[row][group]) or false
+    end
+
+    -- The three real headings are headlines…
+    nx.test.expect(has(3, "nxHelpHeadline")).to_be(true) -- Table of Contents
+    nx.test.expect(has(5, "nxHelpHeadline")).to_be(true) -- 1. Commands
+    nx.test.expect(has(7, "nxHelpHeadline")).to_be(true) -- SUBSECTION ~
+    -- …the delimiter is marked…
+    nx.test.expect(has(2, "nxHelpDelim")).to_be(true)
+    -- …and the ALL-CAPS-prefixed PROSE line is NOT a headline.
+    nx.test.expect(has(9, "nxHelpHeadline")).to_be(false)
+  end)
+
   nx.test.it("renders a >lua … < code block: conceals markers, marks the code", function(t)
     -- A fixture doc with a fenced example; drive window.show directly against it.
     local dir = nx.test.tempdir()
