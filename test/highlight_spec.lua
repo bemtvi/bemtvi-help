@@ -45,6 +45,53 @@ nx.test.describe("nxvim-help highlight", function()
     nx.test.expect(groups["nxHelpDelim"]).to_be_truthy()
   end)
 
+  nx.test.it("renders a >lua … < code block: conceals markers, marks the code", function(t)
+    -- A fixture doc with a fenced example; drive window.show directly against it.
+    local dir = nx.test.tempdir()
+    local file = dir .. "/topic.txt"
+    nx.await(nx.fs.write(
+      file,
+      table.concat({
+        "*topic*  A topic.",
+        "",
+        "Use it like this: >lua",
+        "  local x = nx.foo()",
+        "<Back to prose.",
+      }, "\n")
+    ))
+    window.show({ file = file, name = "topic" })
+
+    local buf = t:wait_for(function()
+      return window.bufnr()
+    end)
+    -- markers are gone from the displayed text
+    local lines = t:wait_for(function()
+      local ls = nx.buf.lines(buf, 0, -1, false)
+      return ls[3] == "Use it like this:" and ls
+    end)
+    nx.test.expect(lines[3]).to_be("Use it like this:") -- `>lua` concealed
+    nx.test.expect(lines[5]).to_be("Back to prose.") -- leading `<` concealed
+
+    -- the code line carries the code-block highlight
+    local groups = t:wait_for(function()
+      local g = {}
+      for _, mk in ipairs(nx.buf.extmarks(buf, highlight.ns, 0, -1, { details = true })) do
+        if mk[2] == 3 then -- the `local x = ...` code row (0-based)
+          local d = mk[4]
+          if d and d.hl_group then
+            g[d.hl_group] = true
+          end
+          if d and d.line_hl_group then
+            g[d.line_hl_group] = true
+          end
+        end
+      end
+      return next(g) and g
+    end)
+    nx.test.expect(groups["nxHelpCode"]).to_be_truthy()
+    nx.test.expect(groups["nxHelpCodeBlock"]).to_be_truthy()
+  end)
+
   nx.test.it("marks a *target* span at its exact byte columns", function(t)
     help.help("nxvim-help")
     local buf = t:wait_for(function()

@@ -7,6 +7,7 @@
 -- same window instead of stacking splits.
 
 local highlight = require("nxvim-help.highlight")
+local render = require("nxvim-help.render")
 
 local M = {}
 
@@ -50,7 +51,10 @@ end
 function M.show(entry, line, col)
   return nx.async(function()
     local text = nx.await(nx.fs.read_text(entry.file))
-    local lines = split_lines(text)
+    -- Render code fences (conceal the `>`/`>lua`/`<` markers) before display; line
+    -- count is preserved so the anchor/tag-stack line addressing stays aligned.
+    local rendered = render.prepare(split_lines(text))
+    local lines = rendered.lines
     -- A cached handle can go stale behind our back: `:bd` of the help buffer destroys
     -- the view (its bufnr mirror clears), and `:q` closes its window (winid clears)
     -- without telling us. Drop a dead handle so we recreate it, and decide mount vs
@@ -78,7 +82,7 @@ function M.show(entry, line, col)
     current = entry
     -- Syntax highlighting (cosmetic): apply once the backing buffer exists. Don't
     -- block the show on it; surface a failure rather than swallowing it.
-    highlight.apply_to_view(view, lines):catch(function(e)
+    highlight.apply_to_view(view, lines, rendered.code):catch(function(e)
       nx.notify(
         "nxvim-help: highlight failed: " .. tostring(type(e) == "table" and e.message or e),
         4
