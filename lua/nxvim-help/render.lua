@@ -16,6 +16,15 @@
 
 local M = {}
 
+-- The longest common leading substring of `a` and `b` (both leading-whitespace runs).
+local function common_prefix(a, b)
+  local n, max = 0, math.min(#a, #b)
+  while n < max and a:byte(n + 1) == b:byte(n + 1) do
+    n = n + 1
+  end
+  return a:sub(1, n)
+end
+
 -- If `line` is a code-fence START, return `(stripped, lang)` — the line with the
 -- trailing `>`/`>lang` marker removed, plus the fence language (`"lua"` for `>lua`,
 -- `""` for a bare `>`); otherwise nil. The marker is the last `>` followed only by
@@ -67,55 +76,62 @@ function M.prepare(raw)
       cur.last = row
     end
   end
+  -- Emit `line` as prose, opening a fence if it ends in one. Used for every row that
+  -- is NOT example content: outside a block, the column-1 line that ends one, and the
+  -- remainder of a `<` closing line (`<Then try: >lua` both closes and reopens).
+  local function prose(i, line)
+    local opened, lang = M.strip_start(line)
+    lines[i] = opened or line
+    in_block = opened ~= nil
+    cur = in_block and { lang = lang } or nil
+  end
   for i = 1, #raw do
     local line = raw[i]
     local row = i - 1
     if in_block then
       if line:sub(1, 1) == "<" then
         -- Closing marker: drop the leading `<`; the rest of the line is normal prose.
-        lines[i] = line:sub(2)
-        in_block = false
         close()
+        prose(i, line:sub(2))
       elseif line ~= "" and not line:find("^[ \t]") then
         -- A non-blank line starting in column 1 ends the block *before* itself; this
         -- line is prose (and may itself open the next fence).
         close()
-        local opened, lang = M.strip_start(line)
-        lines[i] = opened or line
-        in_block = opened ~= nil
-        cur = in_block and { lang = lang } or nil
+        prose(i, line)
       else
         -- Indented or blank: example content.
         lines[i] = line
         mark_body(row)
       end
     else
-      local opened, lang = M.strip_start(line)
-      lines[i] = opened or line
-      in_block = opened ~= nil
-      cur = in_block and { lang = lang } or nil
+      prose(i, line)
     end
   end
   close() -- an unclosed block running to end-of-file
 
-  -- Dedent each fenced block by its own common leading indentation, so the code
-  -- sits flush against the block's left edge (it renders on its own background)
-  -- rather than at vim's fixed example indent — panvimdoc prefixes every `>` body
-  -- line with 4 spaces. Relative indentation within the block is preserved (we
-  -- strip the block MINIMUM, computed over lines that have real content), and blank
-  -- rows stay blank. Only code-body columns shift; tags/links are never scanned on
-  -- code rows, so anchor addressing is unaffected (and line count is untouched).
+  -- Dedent each fenced block by its own common leading indentation, so the code sits
+  -- flush against the block's left edge (it renders on its own background) rather than
+  -- at vim's fixed example indent — panvimdoc prefixes every `>` body line with 4
+  -- spaces. Relative indentation within the block is preserved: we strip the longest
+  -- common whitespace PREFIX (as a string, over the rows that have real content), not
+  -- a character count, so a block mixing tabs and spaces has no common prefix and is
+  -- left alone rather than shifted by a tab's worth of the wrong whitespace. Blank rows
+  -- stay blank. Only code-body columns shift; tags/links are never scanned on code
+  -- rows, so anchor addressing is unaffected (and line count is untouched).
   for _, b in ipairs(blocks) do
-    local min
+    local prefix
     for row = b.first, b.last do
       local ws, rest = lines[row + 1]:match("^([ \t]*)(.*)$")
-      if rest ~= "" and (not min or #ws < min) then
-        min = #ws
+      if rest ~= "" then
+        prefix = prefix and common_prefix(prefix, ws) or ws
+        if prefix == "" then
+          break
+        end
       end
     end
-    if min and min > 0 then
+    if prefix and prefix ~= "" then
       for row = b.first, b.last do
-        lines[row + 1] = lines[row + 1]:sub(min + 1)
+        lines[row + 1] = lines[row + 1]:sub(#prefix + 1)
       end
     end
   end

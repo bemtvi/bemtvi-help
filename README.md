@@ -19,7 +19,14 @@ K                      help for the word under the cursor (opt-in)
 It works out of the box: the plugin auto-registers `:help` on load, and any installed
 plugin that ships a `doc/` directory is discovered automatically — exactly like dropping
 `doc/` into a neovim plugin. A `tags` file is optional (targets are derived from
-`doc/*.txt` when absent).
+`doc/*.txt` when absent), and what counts as a target follows vim's own scanner — a
+whitespace-delimited `*tag*`, never an inline mention or a star inside a `>` example — so
+a doc that writes *about* help tags doesn't squat on generic topics.
+
+The help buffer is highlighted with groups linked to standard highlights (headings,
+targets, links, inline code), and vim's `>lua` … `<` code fences render as real code
+blocks: markers concealed, body dedented to its own left edge, on a full-width background,
+token-highlighted by the fence's language wherever a tree-sitter grammar is installed.
 
 ## Install
 
@@ -35,9 +42,10 @@ require("nxvim-help").setup({ keywordprg = true })
 
 ## Documentation
 
-Full docs — commands, the topic picker, how plugins register help, `:NxHelptags`,
-topic resolution, `K`/`keywordprg`, and `setup()` — live in the help file. The same
-source renders both on GitHub and in the editor:
+Full docs — commands, the topic picker, how plugins register help (and exactly what
+counts as a tag), `:NxHelptags`, topic resolution, `K`/`keywordprg`, `setup()`,
+highlighting, and code blocks — live in the help file. The same source renders both on
+GitHub and in the editor:
 
 - In editor: `:help nxvim-help`
 - On GitHub: [doc/nxvim-help.md](./doc/nxvim-help.md) (the help source)
@@ -45,8 +53,10 @@ source renders both on GitHub and in the editor:
 ## Development
 
 Pure-Lua [`nx.test`](https://github.com/davidrios/nxvim) specs drive a real editor over a
-temp filesystem — tag parsing/merge/lookup, helptags generation, the tags-optional scan,
-real runtimepath discovery, and opening a topic at its anchor:
+temp filesystem — target extraction, tag parsing/merge/lookup, helptags generation, the
+tags-optional scan, real runtimepath discovery, fence rendering, buffer highlighting, the
+picker source, the tag stack, `setup()` option handling, and opening a topic at its
+anchor:
 
 ```sh
 nxvim --test-plugin .

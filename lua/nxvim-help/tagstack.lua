@@ -6,18 +6,18 @@
 -- and restores that exact position.
 
 local index = require("nxvim-help.index")
+local util = require("nxvim-help.util")
 local window = require("nxvim-help.window")
 
 local M = {}
 
 local stack = {}
 
-local function run(body)
-  nx.async(body)():catch(function(e)
-    local msg = type(e) == "table" and e.message or e
-    nx.notify("nxvim-help: " .. tostring(msg), 4)
-  end)
-end
+-- Vim's `'tagstack'` depth. Drilling far enough down a chain of |links| drops the
+-- oldest entry rather than growing the stack for the life of the session.
+local MAX_DEPTH = 20
+
+local run = util.run
 
 -- The help tag at byte column `col` (0-based) in `line`. A `|hot-link|` or `*target*`
 -- the cursor sits within yields its inner text; otherwise the maximal run of non-space,
@@ -88,6 +88,9 @@ function M.follow()
       -- Record the full (line, col) so `<C-t>` returns to the exact spot, not just
       -- the line. `pos` is the live cursor we already read above for `tag_at`.
       stack[#stack + 1] = { entry = from, line = pos[1], col = pos[2] }
+      if #stack > MAX_DEPTH then
+        table.remove(stack, 1)
+      end
     end
     nx.await(window.show(entry))
   end)

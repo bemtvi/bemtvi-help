@@ -5,34 +5,30 @@
 -- vim's command-line tag completion (nxvim user commands have no completer hook) with
 -- something better.
 
+local helptags = require("nxvim-help.helptags")
 local index = require("nxvim-help.index")
+local util = require("nxvim-help.util")
 local window = require("nxvim-help.window")
 
 local M = {}
 
--- Run an async body, surfacing a rejection as an error notification.
-local function run(body)
-  nx.async(body)():catch(function(e)
-    local msg = type(e) == "table" and e.message or e
-    nx.notify("nxvim-help: " .. tostring(msg), 4)
-  end)
-end
+-- Anchor rows (`helptags.target_rows`) memoized per help file, valid for one index
+-- build: the tags don't move while the index they came from is current, so reopening
+-- the picker doesn't re-read and re-scan every doc file. Keyed on the index table's
+-- identity — a rebuild mints a new one, which drops the whole cache. Scanning a file
+-- once for ALL of its tags also replaces the old per-tag search, which cost a `find`
+-- plus a newline count over the whole prefix for every single tag.
+local cache = { idx = nil, rows = {} }
 
--- 1-based line of the `*tag*` anchor within `text` (1 if absent) — where the location
--- preview should sit for that topic.
-local function anchor_row(text, tag)
-  local pos = text:find("*" .. tag .. "*", 1, true)
-  if not pos then
-    return 1
+local function rows_for(idx, file)
+  if cache.idx ~= idx then
+    cache = { idx = idx, rows = {} }
   end
-  local _, n = text:sub(1, pos):gsub("\n", "")
-  return n + 1
-end
-
--- The help file's basename, the second (aligned) picker column — e.g.
--- `/…/doc/nxvim-help.txt` -> `nxvim-help.txt`.
-local function help_file(path)
-  return path:match("([^/]+)$") or path
+  if not cache.rows[file] then
+    local ok, text = pcall(nx.await, nx.fs.read_text(file))
+    cache.rows[file] = helptags.target_rows((ok and text) or "")
+  end
+  return cache.rows[file]
 end
 
 -- Stream every known tag as a picker item. `text` is `tag  file` — the tag padded to
@@ -55,22 +51,14 @@ function M.items(ctx)
       width = math.max(width, #tag)
     end
     width = math.min(width, 48)
-    -- Read each file at most once; many tags share one file.
-    local cache = {}
-    local function text_of(file)
-      if cache[file] == nil then
-        local ok, t = pcall(nx.await, nx.fs.read_text(file))
-        cache[file] = (ok and t) or ""
-      end
-      return cache[file]
-    end
+    local format = "%-" .. width .. "s  %s"
     for _, tag in ipairs(tags) do
       local entry = idx[tag]
       ctx.push({
-        text = string.format("%-" .. width .. "s  %s", tag, help_file(entry.file)),
+        text = string.format(format, tag, nx.utils.basename(entry.file) or entry.file),
         entry = entry,
         path = entry.file,
-        row = anchor_row(text_of(entry.file), tag),
+        row = rows_for(idx, entry.file)[tag] or 1,
         col = 1,
       })
     end
@@ -79,17 +67,20 @@ end
 
 -- Open the chosen topic in the help window.
 function M.confirm(item)
-  run(function()
+  util.run(function()
     nx.await(window.show(item.entry))
   end)
 end
 
 -- Register the source (idempotent — keyed by name; a re-require overwrites). Named
--- nxvim_help so it can't clash with a built-in source.
+-- nxvim_help so it can't clash with a built-in source. Single-choice: `<Tab>` marking
+-- a batch of topics would have nothing to act on, since confirm opens exactly one.
 nx.picker.source({
   name = "nxvim_help",
   items = M.items,
   confirm = M.confirm,
+  title = "Help Topics",
+  multiselect = false,
   preview = "location", -- preview the doc scrolled to the highlighted topic
 })
 

@@ -4,9 +4,24 @@
 -- (clearing our namespace first) rather than running a live decoration provider.
 -- Groups link to standard groups so any colorscheme styles them.
 
+local helptags = require("nxvim-help.helptags")
+local util = require("nxvim-help.util")
+
 local M = {}
 
 M.ns = nx.ns.create("nxvim-help")
+
+-- The paint generation. Every repaint of the help buffer bumps it, and the async
+-- per-language token overlay carries the generation it was started for: when a second
+-- `:help` lands while the tree-sitter highlight of the first is still in flight, the
+-- resolved spans belong to a document that is no longer on screen, so they are dropped
+-- instead of painted at rows and columns that now hold different text.
+M._gen = 0
+
+local function bump()
+  M._gen = M._gen + 1
+  return M._gen
+end
 
 -- Linked groups: a colorscheme that defines Title/Comment/Label/Identifier/String
 -- (essentially all of them) styles help for free.
@@ -38,8 +53,10 @@ end
 -- Place all highlights for `lines` on `buf` (clearing the namespace first). `code`
 -- (optional) is a set of 0-based rows that are fenced example content — those rows get
 -- the code-block highlight and skip the prose scans (a `*foo*` inside code is not a tag).
+-- Returns the paint generation, which `apply_tokens` takes to detect being superseded.
 function M.apply(buf, lines, code)
   code = code or {}
+  local gen = bump()
   nx.buf.clear_namespace(buf, M.ns, 0, -1)
   for i, line in ipairs(lines) do
     local row = i - 1
@@ -65,11 +82,17 @@ function M.apply(buf, lines, code)
           mark(buf, row, 1, #htext, "nxHelpHeadline")
         end
       end
-      scan(buf, row, line, '%*[^ \t*"]+%*', "nxHelpTag")
+      -- Tags come from the shared vimdoc scanner rather than a loose `*…*` pattern, so
+      -- the highlight marks exactly what the INDEX considers a tag — otherwise a bold
+      -- run or a backticked mention paints as a tag that `<C-]>` then can't resolve.
+      for _, s, e in helptags.line_targets(line) do
+        mark(buf, row, s, e, "nxHelpTag")
+      end
       scan(buf, row, line, "|[^| \t]+|", "nxHelpLink")
       scan(buf, row, line, "`[^`]+`", "nxHelpCode")
     end
   end
+  return gen
 end
 
 -- Priority for the per-language token marks, above the flat `nxHelpCode` base so a
@@ -85,9 +108,13 @@ local TOKEN_PRIORITY = 4200
 -- rows — displayed text equals the raw text on code rows (only fence *markers* are
 -- concealed), so a span's byte columns are the extmark columns directly. Async (the
 -- highlight is a promise); a language with no installed grammar returns no spans, so
--- the block simply keeps its flat `nxHelpCode` colour. Returns a promise.
-function M.apply_tokens(buf, lines, blocks)
+-- the block simply keeps its flat `nxHelpCode` colour. `gen` is the paint generation
+-- these blocks belong to (defaulting to the current one): if a later repaint bumps it
+-- while a block's highlight is in flight, the overlay stops rather than marking up the
+-- document that replaced it. Returns a promise.
+function M.apply_tokens(buf, lines, blocks, gen)
   return nx.async(function()
+    gen = gen or M._gen
     for _, b in ipairs(blocks or {}) do
       if b.lang and b.lang ~= "" and b.first then
         local body = {}
@@ -95,6 +122,9 @@ function M.apply_tokens(buf, lines, blocks)
           body[#body + 1] = lines[r + 1]
         end
         local spans = nx.await(nx.treesitter.highlight(b.lang, table.concat(body, "\n")))
+        if gen ~= M._gen then
+          return -- superseded while the highlight ran; these spans are stale
+        end
         for _, sp in ipairs(spans) do
           if sp.col_end > sp.col_start then
             -- The engine reports tree-sitter capture names (`keyword`, `function.call`);
@@ -119,14 +149,21 @@ end
 -- promise (settled once the base marks are placed and the token overlay is kicked off).
 function M.apply_to_view(view, lines, code, blocks)
   return nx.async(function()
+    -- Claim the paint up front: a `:help` issued while we wait on the buffer bumps the
+    -- generation, and painting THIS document's marks afterwards would show the wrong
+    -- text's colouring.
+    local claim = bump()
     local buf = view:bufnr()
       or nx.await(nx.wait_for(function()
         return view:bufnr()
       end, { tries = 100, interval = 5, message = "help buffer never appeared" }))
-    M.apply(buf, lines, code)
+    if claim ~= M._gen then
+      return
+    end
+    local gen = M.apply(buf, lines, code)
     -- Don't block the show on the token overlay; surface a failure rather than swallow.
-    M.apply_tokens(buf, lines, blocks):catch(function(e)
-      nx.notify("nxvim-help: code highlight failed: " .. tostring(e), 3)
+    M.apply_tokens(buf, lines, blocks, gen):catch(function(e)
+      nx.notify("nxvim-help: code highlight failed: " .. util.errmsg(e), 3)
     end)
   end)()
 end

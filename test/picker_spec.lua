@@ -20,7 +20,7 @@ end
 nx.test.describe("nxvim-help picker", function()
   nx.test.before_each(function()
     window._reset()
-    index._index = nil -- fresh runtimepath scan
+    index.invalidate()
     help.setup()
   end)
 

@@ -11,7 +11,8 @@ Table of Contents                               *nxvim-help-table-of-contents*
 6. Keyword lookup                                  |nxvim-help-keyword-lookup|
 7. Setup                                                    |nxvim-help-setup|
 8. Highlighting                                      |nxvim-help-highlighting|
-9. Notes                                                    |nxvim-help-notes|
+9. Code blocks                                        |nxvim-help-code-blocks|
+10. Notes                                                   |nxvim-help-notes|
 
 Vim-style `:help` for nxvim — an optional first-party plugin built entirely
 on the native `nx.*` plugin API (ADR 0002
@@ -95,7 +96,19 @@ i.e. `tag<Tab>file<Tab>address`, with `file` relative to its `doc/` directory.
 directory argument it does just that one. It is named `:NxHelptags` because
 nxvim core owns `:helptags`. Because the index reads `.txt` directly, this is
 for interop and startup speed, not correctness. Duplicate tags in a directory
-are reported.
+are reported (each clashing tag named once).
+
+What counts as a target follows vim's own rule, which matters when your doc
+writes _about_ help tags rather than defining one:
+
+- The opening star must sit at column 1 or right after a space or tab, and the closing star must
+    be followed by whitespace or the end of the line. So a bold run, a backticked mention, or a C
+    dereference (`int *p*`) is prose, not a tag.
+- The text between the stars may not contain a space, a tab, or `|`.
+- Stars inside a `>` code example are skipped entirely — sample code is code.
+
+Without those rules a doc that merely _mentions_ `*targets*` would claim the
+generic topic `targets` for the whole runtimepath.
 
 
 ==============================================================================
@@ -110,16 +123,26 @@ resolves to `nxvim-help-usage`. An unmatched topic is a loud `E149`.
 
 `K` — help for the word under the cursor — is opt-in, so it leaves an
 LSP-hover `K` alone by default. Enable it with `setup({ keywordprg = true })`.
-It uses `<cWORD>` (the whole non-blank token, since help tags contain `.` and
-`-` that `<cword>` stops at) and trims surrounding punctuation, so `(nx.view)`
-and `|tag|` both resolve. No word under the cursor is a loud no-op.
+It reads `<cWORD>` (the whole non-blank token, since help tags contain `.` and
+`-` that `<cword>` stops at) and tries two topics in order:
+
+1. The token exactly as written. Help tags carry punctuation of their own — an option is
+tagged `*'number'*`, a key `*CTRL-]*` — so the verbatim form has to win.
+2. The token with surrounding punctuation trimmed, which catches a tag caught in prose
+punctuation: `(nx.view)`, `|tag|`, a trailing full stop.
+
+No word under the cursor is a loud no-op.
 
 
 ==============================================================================
 7. Setup                                                    *nxvim-help-setup*
 
 `setup()` is optional — the plugin auto-registers its commands on load.
-Registration happens once; a later `setup{...}` still applies its options.
+Command registration happens once, but the options are re-applied on every
+call, so a later `setup{...}` in your config can move or withdraw a keymap an
+earlier call bound (the auto-loader has already run `setup()` with the defaults
+by the time your config is reached — without this, `search_keymap = false`
+could never take effect). Only maps nxvim-help itself bound are ever removed.
 
 >lua
     require("nxvim-help").setup({
@@ -138,17 +161,55 @@ Registration happens once; a later `setup{...}` still applies its options.
 8. Highlighting                                      *nxvim-help-highlighting*
 
 The help buffer is syntax-highlighted with extmark groups linked to standard
-highlights: section headings, `*targets*`, `|links|`, and inline code spans.
+highlights, so a colorscheme styles it for free:
+
+>
+    nxHelpHeadline   Title              a section heading
+    nxHelpDelim      Comment            the ==== / ---- rules
+    nxHelpTag        Label              a *target*
+    nxHelpLink       Identifier         a |hot-link|
+    nxHelpCode       String             an inline `code` span, and code-block text
+    nxHelpCodeBlock  @markup.raw.block  a code block's full-width background
+<
+
+A heading is recognized by vimdoc structure — text at column 1 followed by a
+right-aligned `*tag*`, or an H3-style `TITLE ~` — not by an ALL-CAPS run, so
+a numbered or mixed-case panvimdoc title is highlighted and a sentence that
+merely opens with capitals is not.
 
 
 ==============================================================================
-9. Notes                                                    *nxvim-help-notes*
+9. Code blocks                                        *nxvim-help-code-blocks*
+
+Vim marks an example with a fence: a line ending in `>` (optionally with a
+language, `>lua` / `>vim`) opens it, and a line starting with `<` — or any
+line that starts in column 1 — closes it. nxvim has no `'conceal'`, so
+nxvim-help rewrites those markers out of the displayed text instead, exactly
+one output line per input line so tag anchors and the tag stack stay aligned.
+
+Each block is then dedented to its own left edge (panvimdoc indents every body
+line by four spaces) with relative indentation preserved, painted on a
+full-width background, and — when the fence names a language whose
+tree-sitter grammar is installed — token-highlighted the way an injected code
+block is anywhere else in nxvim. A language with no grammar simply keeps the
+flat code colour.
+
+
+==============================================================================
+10. Notes                                                   *nxvim-help-notes*
 
 nxvim-help is built on the native `nx.*` surfaces only — `nx.view` (the
-read-only split), `nx.fs` (promise reads), `nx.picker` (the topic finder), and
-`nx.runtime_file` (runtimepath discovery). It adds no core changes; it is a
-worked example of a substantial editor feature living entirely as an `nx.*`
+read-only split), `nx.fs` (promise reads), `nx.picker` (the topic finder),
+`nx.runtime_file` (runtimepath discovery), `nx.buf.set_extmark` (the
+highlighting), `nx.treesitter.highlight` (code-block tokens), and `nx.keymap` /
+`nx.user_command` / `nx.autocmd` (the bindings). It adds no core changes; it is
+a worked example of a substantial editor feature living entirely as an `nx.*`
 plugin.
+
+Every disk read goes through the promise filesystem, never a blocking call, and
+the tag index is built once and shared: callers that race for it (a `:help` and
+the picker opening together) join the same scan rather than each walking the
+runtimepath. `:NxHelptags` invalidates it.
 
 Generated by panvimdoc <https://github.com/kdheepak/panvimdoc>
 

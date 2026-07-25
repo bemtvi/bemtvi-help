@@ -75,6 +75,43 @@ nx.test.describe("nxvim-help.render", function()
     nx.test.expect(r.code[4]).to_be_truthy()
   end)
 
+  nx.test.it("reopens a fence on the prose that follows a `<` closing marker", function()
+    -- `<Then try: >lua` closes one example and opens the next on the same line — the
+    -- closing branch used to emit the remainder as plain prose, so the second block's
+    -- body was never flagged as code and its `>lua` marker stayed visible.
+    local raw = split(table.concat({
+      "First: >", -- row 0  opening fence
+      "  one", -- row 1  code
+      "<Then try: >lua", -- row 2  close + reopen -> "Then try:"
+      "  two", -- row 3  code (second block)
+      "Prose.", -- row 4  column-1 line ends it
+    }, "\n"))
+    local r = render.prepare(raw)
+    nx.test.expect(r.lines[3]).to_be("Then try:")
+    nx.test.expect(r.code[1]).to_be_truthy() -- first block body
+    nx.test.expect(r.code[3]).to_be_truthy() -- second block body
+    nx.test.expect(r.code[2]).to_be_nil() -- the fence line itself is prose
+    nx.test.expect(r.lines[4]).to_be("two") -- dedented as a code body
+    nx.test.expect(#r.blocks).to_be(2)
+    nx.test.expect(r.blocks[2].lang).to_be("lua")
+  end)
+
+  nx.test.it("leaves a mixed tab/space block undedented rather than mis-shifting it", function()
+    -- Dedent strips the block's longest COMMON leading-whitespace prefix. With one row
+    -- indented by a tab and another by spaces there is no common prefix, so nothing is
+    -- stripped — the old character-count minimum would have eaten one tab's worth of a
+    -- space-indented row (and vice versa), skewing the code.
+    local raw = split(table.concat({
+      "Mixed: >", -- row 0
+      "\ttabbed", -- row 1  tab indent
+      "    spaced", -- row 2  space indent
+      "Prose.", -- row 3
+    }, "\n"))
+    local r = render.prepare(raw)
+    nx.test.expect(r.lines[2]).to_be("\ttabbed")
+    nx.test.expect(r.lines[3]).to_be("    spaced")
+  end)
+
   nx.test.it("ends an unclosed block at the next column-1 line", function()
     local raw = split(table.concat({
       "Header: >", -- row 0  opening fence

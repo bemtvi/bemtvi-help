@@ -8,6 +8,7 @@
 
 local highlight = require("nxvim-help.highlight")
 local render = require("nxvim-help.render")
+local util = require("nxvim-help.util")
 
 local M = {}
 
@@ -26,24 +27,6 @@ local function anchor_line(lines, tag)
   return 1
 end
 
--- Split text into lines without a synthetic trailing blank from a final newline.
-local function split_lines(text)
-  local out = {}
-  local start = 1
-  while true do
-    local nl = text:find("\n", start, true)
-    if not nl then
-      if #text >= start then
-        out[#out + 1] = text:sub(start)
-      end
-      break
-    end
-    out[#out + 1] = text:sub(start, nl - 1)
-    start = nl + 1
-  end
-  return out
-end
-
 -- Open `entry` in the help split. Jumps to `line` if given (used to restore position
 -- when popping the tag stack), else to the tag's `*anchor*`. `col` (0-based) refines
 -- the cursor to an exact column — the tag stack passes it so `<C-t>` lands back on the
@@ -53,7 +36,7 @@ function M.show(entry, line, col)
     local text = nx.await(nx.fs.read_text(entry.file))
     -- Render code fences (conceal the `>`/`>lua`/`<` markers) before display; line
     -- count is preserved so the anchor/tag-stack line addressing stays aligned.
-    local rendered = render.prepare(split_lines(text))
+    local rendered = render.prepare(util.split_lines(text))
     local lines = rendered.lines
     -- A cached handle can go stale behind our back: `:bd` of the help buffer destroys
     -- the view (its bufnr mirror clears), and `:q` closes its window (winid clears)
@@ -83,10 +66,7 @@ function M.show(entry, line, col)
     -- Syntax highlighting (cosmetic): apply once the backing buffer exists. Don't
     -- block the show on it; surface a failure rather than swallowing it.
     highlight.apply_to_view(view, lines, rendered.code, rendered.blocks):catch(function(e)
-      nx.notify(
-        "nxvim-help: highlight failed: " .. tostring(type(e) == "table" and e.message or e),
-        4
-      )
+      nx.notify("nxvim-help: highlight failed: " .. util.errmsg(e), 4)
     end)
     return view
   end)()

@@ -10,24 +10,24 @@
 -- tags file" precedence.
 
 local helptags = require("nxvim-help.helptags")
+local util = require("nxvim-help.util")
 
 local M = {}
 
 -- The merged tag -> entry map, built lazily on first :help and cached. nil until built.
 M._index = nil
 
--- dirname of an absolute path (strip the final /component). The tags `file` column is
--- relative to the directory holding its tags file, so we resolve against this.
-local function dirname(path)
-  return (path:gsub("/[^/]*$", ""))
-end
+-- The in-flight build promise, so two callers racing for the index (a `:help` and the
+-- picker source opening together) share ONE runtimepath scan instead of each reading
+-- every doc file. Cleared when the build settles.
+local building = nil
 
 -- Parse one tags file's text into `out` (tag -> entry), resolving each `file` column
 -- against `dir`. Skips blank lines and ctags `!_TAG_` header pragmas. The first
 -- writer of a tag wins (runtimepath precedence), so a later file never clobbers an
 -- earlier tag.
 function M.parse_into(out, text, dir)
-  for line in (text .. "\n"):gmatch("(.-)\n") do
+  for _, line in ipairs(util.split_lines(text)) do
     if line ~= "" and line:sub(1, 1) ~= "!" then
       local tag, file = line:match("^([^\t]+)\t([^\t]+)\t")
       if tag and file and not out[tag] then
@@ -48,7 +48,7 @@ function M.build_from(tag_files)
     for _, tf in ipairs(tag_files or {}) do
       local ok, text = pcall(nx.await, nx.fs.read_text(tf))
       if ok and text then
-        M.parse_into(out, text, dirname(tf))
+        M.parse_into(out, text, nx.utils.dirname(tf))
       end
     end
     return out
@@ -92,7 +92,7 @@ function M.build()
     for _, tf in ipairs(nx.runtime_file("doc/tags", true) or {}) do
       local ok, text = pcall(nx.await, nx.fs.read_text(tf))
       if ok and text then
-        local dir = dirname(tf)
+        local dir = nx.utils.dirname(tf)
         has_tags[dir] = true
         M.parse_into(out, text, dir)
       end
@@ -100,7 +100,7 @@ function M.build()
     -- doc/ dirs with .txt but no tags file: derive targets directly.
     local seen_dir = {}
     for _, txt in ipairs(nx.runtime_file("doc/*.txt", true) or {}) do
-      local dir = dirname(txt)
+      local dir = nx.utils.dirname(txt)
       if not has_tags[dir] and not seen_dir[dir] then
         seen_dir[dir] = true
         local derived = nx.await(M.scan_dir(dir))
@@ -116,13 +116,32 @@ function M.build()
   end)()
 end
 
--- The index, building it on first use. Promise of the tag -> entry map.
+-- Drop the cached index so the next `ensure()` rescans the runtimepath — after
+-- `:NxHelptags` writes new tags files, or when a test wants a fresh scan.
+function M.invalidate()
+  M._index = nil
+  building = nil
+end
+
+-- The index, building it on first use. Promise of the tag -> entry map. Concurrent
+-- callers share the in-flight build rather than each starting their own.
 function M.ensure()
   return nx.async(function()
-    if not M._index then
-      nx.await(M.build())
+    if M._index then
+      return M._index
     end
-    return M._index
+    if not building then
+      building = M.build()
+    end
+    -- Every waiter awaits the SAME promise and clears the slot on the way out, so a
+    -- failed scan doesn't wedge a rejected promise in place and the next `:help`
+    -- retries. `pcall` around the await keeps the rejection propagating unchanged.
+    local ok, res = pcall(nx.await, building)
+    building = nil
+    if not ok then
+      error(res, 0)
+    end
+    return res
   end)()
 end
 

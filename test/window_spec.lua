@@ -29,7 +29,7 @@ end
 nx.test.describe("nxvim-help window", function()
   nx.test.before_each(function()
     window._reset()
-    index._index = nil -- force a fresh runtimepath scan
+    index.invalidate()
     help.setup()
   end)
 
@@ -44,6 +44,20 @@ nx.test.describe("nxvim-help window", function()
     local idx = nx.await(index.build())
     nx.test.expect(idx["nxvim-help"]).to_be_truthy()
     nx.test.expect(idx["nxvim-help-usage"]).to_be_truthy()
+  end)
+
+  nx.test.it("indexes only real targets from the runtimepath docs", function()
+    -- A doc that *writes about* help tags mentions `*targets*` / `*tag*` inline and
+    -- shows `*ptr*`-style code in its examples. vim's scanner rejects both (not
+    -- whitespace-delimited / inside a `>` example) and so must ours — otherwise this
+    -- plugin's own doc squats on generic topics and `:help tag` lands on it.
+    local idx = nx.await(index.build())
+    for _, junk in ipairs({ "target", "targets", "tag", "structure", "my-topic" }) do
+      nx.test.expect(idx[junk]).to_be_falsy()
+    end
+    -- the real tags are of course still there
+    nx.test.expect(idx["nxvim-help"]).to_be_truthy()
+    nx.test.expect(idx["nxvim-help-highlighting"]).to_be_truthy()
   end)
 
   nx.test.it("opens :help {topic} and lands on the tag anchor", function(t)

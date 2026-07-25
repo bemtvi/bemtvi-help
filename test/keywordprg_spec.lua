@@ -12,7 +12,7 @@ end
 nx.test.describe("nxvim-help keywordprg (K)", function()
   nx.test.before_each(function()
     window._reset()
-    index._index = nil
+    index.invalidate()
     help.setup({ keywordprg = true })
   end)
 
@@ -43,5 +43,49 @@ nx.test.describe("nxvim-help keywordprg (K)", function()
     help.help_cword()
     t:feed("") -- settle a tick
     nx.test.expect(window.bufnr()).to_be_falsy()
+  end)
+
+  nx.test.it("K resolves a punctuated tag verbatim before trying the trimmed word", function(t)
+    -- Option tags carry their quotes (`*'number'*`) and key tags their brackets
+    -- (`*CTRL-]*`). Unconditionally trimming punctuation off <cWORD> destroyed those:
+    -- `'number'` became `number`, which resolves elsewhere or to E149. The raw token
+    -- must be tried first, with the trimmed form only as a fallback.
+    local dir = nx.test.tempdir()
+    local quoted = dir .. "/quoted.txt"
+    nx.await(nx.fs.write(quoted, "*'number'*\tthe quoted option topic\n"))
+    index._index = { ["'number'"] = { file = quoted, name = "'number'" } }
+
+    t:feed("i'number'<Esc>0")
+    help.help_cword()
+    local txt = t:wait_for(function()
+      local b = window.bufnr()
+      if not b then
+        return nil
+      end
+      local s = buf_text(b)
+      return s:find("the quoted option topic", 1, true) and s
+    end)
+    nx.test.expect(txt).to_contain("the quoted option topic")
+  end)
+
+  nx.test.it("K still falls back to the trimmed word for surrounding punctuation", function(t)
+    -- `(nx.view)` / `|tag|` must still resolve: nothing indexes the punctuated form,
+    -- so the trimmed candidate carries the lookup.
+    local dir = nx.test.tempdir()
+    local plain = dir .. "/plain.txt"
+    nx.await(nx.fs.write(plain, "*nx.view*\tthe bare topic body\n"))
+    index._index = { ["nx.view"] = { file = plain, name = "nx.view" } }
+
+    t:feed("i(nx.view)<Esc>0")
+    help.help_cword()
+    local txt = t:wait_for(function()
+      local b = window.bufnr()
+      if not b then
+        return nil
+      end
+      local s = buf_text(b)
+      return s:find("the bare topic body", 1, true) and s
+    end)
+    nx.test.expect(txt).to_contain("the bare topic body")
   end)
 end)

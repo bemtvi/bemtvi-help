@@ -9,8 +9,14 @@
 -- docs are found the same way.
 --
 -- Module map:
---   index.lua    runtimepath tags scan + parse + merge + topic lookup
---   window.lua   render a resolved entry in a read-only help split
+--   index.lua     runtimepath tags scan + parse + merge + topic lookup
+--   helptags.lua  `*target*` extraction and `doc/tags` generation (:NxHelptags)
+--   window.lua    show a resolved entry in the read-only help split (an nx.view)
+--   render.lua    conceal vim's `>lua` … `<` code fences before display
+--   highlight.lua the help buffer's extmark highlighting, incl. code-block tokens
+--   picker.lua    the nx.picker source behind a bare `:help`
+--   tagstack.lua  <C-]> / <CR> follow and <C-t> back
+--   util.lua      the small glue the modules share (async runner, line splitting)
 --
 -- Quick start (init.lua): require("nxvim-help").setup() — then `:help nxvim-help`.
 
@@ -19,20 +25,30 @@ local window = require("nxvim-help.window")
 local helptags = require("nxvim-help.helptags")
 local picker = require("nxvim-help.picker")
 local tagstack = require("nxvim-help.tagstack")
+local util = require("nxvim-help.util")
 
 local M = {}
 
--- Run an async body, surfacing any rejection as an error notification rather than an
--- unhandled promise error.
-local function run(body)
-  nx.async(body)():catch(function(e)
-    local msg = type(e) == "table" and e.message or e
-    nx.notify("nxvim-help: " .. tostring(msg), 4)
-  end)
-end
+local run, trim = util.run, util.trim
 
-local function trim(s)
-  return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+-- How many clashing tags `:NxHelptags` names before it switches to "(+N more)".
+local DUPES_SHOWN = 10
+
+-- Open the first of `candidates` that resolves against the tag index. More than one
+-- candidate is how `K` offers a fallback (see help_cword); a failure names the FIRST
+-- candidate, which is what the user actually pointed at.
+local function open_first(candidates)
+  run(function()
+    local idx = nx.await(index.ensure())
+    for _, topic in ipairs(candidates) do
+      local entry = index.lookup(idx, topic)
+      if entry then
+        nx.await(window.show(entry))
+        return
+      end
+    end
+    nx.notify('E149: Sorry, no help for "' .. candidates[1] .. '"', 4)
+  end)
 end
 
 -- :help [topic] — with a topic, resolve it against the merged runtimepath tag index
@@ -44,15 +60,7 @@ function M.help(topic)
     picker.open()
     return
   end
-  run(function()
-    local idx = nx.await(index.ensure())
-    local entry = index.lookup(idx, topic)
-    if not entry then
-      nx.notify('E149: Sorry, no help for "' .. topic .. '"', 4)
-      return
-    end
-    nx.await(window.show(entry))
-  end)
+  open_first({ topic })
 end
 
 -- :NxHelptags [dir] — write a vim-style doc/tags from doc/*.txt. No argument (or
@@ -73,32 +81,83 @@ function M.helptags(dir)
       local res = nx.await(helptags.generate(d))
       total = total + res.count
       if #res.dupes > 0 then
-        nx.notify("nxvim-help: duplicate tags in " .. d .. ": " .. table.concat(res.dupes, ", "), 3)
+        -- Name the first few and count the rest: a doc set with a systematic clash can
+        -- report hundreds, and an unbounded list would bury the message it belongs to.
+        local shown = { table.unpack(res.dupes, 1, math.min(#res.dupes, DUPES_SHOWN)) }
+        local more = #res.dupes - #shown
+        nx.notify(
+          "nxvim-help: duplicate tags in "
+            .. d
+            .. ": "
+            .. table.concat(shown, ", ")
+            .. (more > 0 and (" (+" .. more .. " more)") or ""),
+          3
+        )
       end
     end
-    index._index = nil -- invalidate the cache so the next :help sees the new tags
+    index.invalidate() -- the next :help must see the new tags
     nx.notify("nxvim-help: wrote tags for " .. #dirs .. " dir(s), " .. total .. " tags")
   end)
 end
 
+-- The topics to try for `word`, in order: the token EXACTLY as it appears, then the
+-- same token with surrounding punctuation trimmed. Verbatim comes first because help
+-- tags carry punctuation of their own — an option is tagged `*'number'*` and a key
+-- `*CTRL-]*` — so trimming unconditionally would look up `number` / `CTRL-` and land
+-- somewhere else (or nowhere). The trimmed form then covers the ordinary case of a tag
+-- caught in prose punctuation: `(nx.view)`, `|tag|`, a trailing full stop.
+function M.cword_candidates(word)
+  local out = {}
+  local trimmed = word:gsub("^[^%w_]+", ""):gsub("[^%w_]+$", "")
+  for _, w in ipairs({ word, trimmed }) do
+    if w ~= "" and w ~= out[1] then
+      out[#out + 1] = w
+    end
+  end
+  return out
+end
+
 -- :help for the word under the cursor — the `K` / `keywordprg` action. Uses <cWORD>
--- (the whole non-blank token), since help tags contain '.'/'-' that <cword> stops at,
--- then trims surrounding punctuation (so `(nx.view)` / `|tag|` resolve). No word under
--- the cursor is a loud no-op (not the bare-:help picker, which would surprise on K).
+-- (the whole non-blank token), since help tags contain '.'/'-' that <cword> stops at.
+-- No word under the cursor is a loud no-op (not the bare-:help picker, which would
+-- surprise on K).
 function M.help_cword()
-  local word = (nx.expand("<cWORD>") or ""):gsub("^[^%w_]+", ""):gsub("[^%w_]+$", "")
-  if word == "" then
+  local candidates = M.cword_candidates(nx.expand("<cWORD>") or "")
+  if #candidates == 0 then
     nx.notify("nxvim-help: no word under the cursor", 3)
     return
   end
-  M.help(word)
+  open_first(candidates)
 end
 
 local registered = false
 
--- setup([opts]) — register the commands/keymaps (once) and apply per-call options.
--- The auto-loader (plugin/nxvim-help.lua) calls setup() with no opts, and a user's
--- later setup{...} still takes effect: registration is one-time, opts are not.
+-- The lhs each setup-owned map currently occupies (nil when unbound), so a later
+-- setup() can MOVE or WITHDRAW what an earlier one bound. This is what makes the
+-- documented options honest: the auto-loader (plugin/nxvim-help.lua) already ran
+-- setup() with the defaults by the time a user's own setup{...} is reached, so
+-- `search_keymap = false` has to be able to undo a map, not merely decline to add one.
+-- Only maps we bound ourselves are ever deleted.
+local bound = { search = nil, keywordprg = nil }
+
+local function rebind(slot, lhs, rhs, desc)
+  -- Withdraw the previous binding first — even at the SAME lhs, since `nx.keymap.set`
+  -- appends rather than replaces, so re-running setup() would otherwise stack a
+  -- duplicate mapping on every call.
+  if bound[slot] then
+    nx.keymap.del("n", bound[slot])
+    bound[slot] = nil
+  end
+  if lhs then
+    nx.keymap.set("n", lhs, rhs, { desc = desc })
+    bound[slot] = lhs
+  end
+end
+
+-- setup([opts]) — register the commands (once) and apply the per-call options. The
+-- auto-loader (plugin/nxvim-help.lua) calls setup() with no opts, and a user's later
+-- setup{...} still takes effect: command registration is one-time, options are not —
+-- each call re-applies the maps it owns, including removing one it previously bound.
 --   opts.keywordprg = true  → map `K` (normal mode) to help for the word under the
 --   cursor. Off by default so it doesn't clobber an LSP-hover `K`.
 --   opts.search_keymap      → the normal-mode map that opens the help-topic picker
@@ -107,11 +166,9 @@ local registered = false
 function M.setup(opts)
   opts = opts or {}
 
-  if opts.keywordprg then
-    nx.keymap.set("n", "K", function()
-      M.help_cword()
-    end, { desc = "Help for the word under the cursor" })
-  end
+  rebind("keywordprg", opts.keywordprg and "K" or nil, function()
+    M.help_cword()
+  end, "Help for the word under the cursor")
 
   -- <leader>fh opens the topic picker — "find help", the bare `:help` search. On by
   -- default (a leader map rarely collides); pass `search_keymap = false` to skip it,
@@ -120,11 +177,9 @@ function M.setup(opts)
   if search_lhs == nil then
     search_lhs = "<leader>fh"
   end
-  if search_lhs then
-    nx.keymap.set("n", search_lhs, function()
-      M.help("")
-    end, { desc = "Search help topics" })
-  end
+  rebind("search", search_lhs or nil, function()
+    M.help("")
+  end, "Search help topics")
 
   if registered then
     return

@@ -21,7 +21,7 @@ end
 nx.test.describe("nxvim-help highlight", function()
   nx.test.before_each(function()
     window._reset()
-    index._index = nil
+    index.invalidate()
     help.setup()
   end)
 
@@ -202,6 +202,107 @@ nx.test.describe("nxvim-help highlight", function()
     end
     nx.test.expect(groups["nxHelpCode"]).to_be_truthy()
     nx.test.expect(groups["nxHelpCodeBlock"]).to_be_truthy()
+  end)
+
+  nx.test.it("drops a superseded token overlay instead of painting it on the new doc", function(t)
+    -- Regression: `apply_tokens` awaits the (async) tree-sitter highlight per block.
+    -- If a second `:help` repaints the buffer while that await is in flight, the
+    -- resolved spans used to land on the NEW document — stale `@`-group marks at rows
+    -- and columns belonging to the previous one. A generation guard must drop them.
+    local probe = nx.await(nx.treesitter.highlight("lua", "local x = 1\n"))
+    if #probe == 0 then
+      return -- no lua grammar installed; nothing to overlay (external-dep convention)
+    end
+    -- A fence-free doc, just to obtain a live help buffer with enough rows/columns.
+    local dir = nx.test.tempdir()
+    local file = dir .. "/plain.txt"
+    local plain = {
+      "*plain*  A doc.",
+      "",
+      "just prose here",
+      "more prose here",
+      "tail prose here",
+    }
+    nx.await(nx.fs.write(file, table.concat(plain, "\n") .. "\n"))
+    window.show({ file = file, name = "plain" })
+    local buf = t:wait_for(function()
+      return window.bufnr()
+    end)
+    t:wait_for(function()
+      return next(marked_groups(buf)) and true
+    end)
+
+    -- Doc A's overlay goes in flight (row 3 is a `>lua` body holding `local x = 1`)…
+    local pending = highlight.apply_tokens(buf, {
+      plain[1],
+      plain[2],
+      plain[3],
+      "local x = 1",
+      plain[5],
+    }, { { lang = "lua", first = 3, last = 3 } })
+    -- …and doc B repaints the same buffer before it settles.
+    highlight.apply(buf, plain, {})
+    nx.await(pending)
+
+    for _, mk in ipairs(nx.buf.extmarks(buf, highlight.ns, 0, -1, { details = true })) do
+      local g = mk[4] and mk[4].hl_group
+      nx.test.expect(g and g:sub(1, 1) == "@").to_be_falsy()
+    end
+  end)
+
+  nx.test.it("renders a CRLF help file (fences concealed, no stray carriage returns)", function(t)
+    -- A doc/ checked out with CRLF endings must render exactly like an LF one: a
+    -- trailing `\r` used to defeat the fence match (`>lua\r`), leaving the markers
+    -- visible and a `\r` on every displayed line.
+    local dir = nx.test.tempdir()
+    local file = dir .. "/crlf.txt"
+    nx.await(nx.fs.write(file, "*crlf*  A doc.\r\n\r\nUse it: >lua\r\n  local x = 1\r\n<done\r\n"))
+    window.show({ file = file, name = "crlf" })
+    local buf = t:wait_for(function()
+      return window.bufnr()
+    end)
+    local lines = t:wait_for(function()
+      local ls = nx.buf.lines(buf, 0, -1, false)
+      return ls[1] == "*crlf*  A doc." and ls
+    end)
+    nx.test.expect(lines[3]).to_be("Use it:") -- `>lua` concealed, no `\r`
+    nx.test.expect(lines[4]).to_be("local x = 1") -- dedented, no `\r`
+    nx.test.expect(lines[5]).to_be("done") -- leading `<` concealed, no `\r`
+  end)
+
+  nx.test.it("marks only whitespace-delimited targets, not inline star pairs", function(t)
+    -- The tag highlight has to agree with what the INDEX considers a tag; otherwise a
+    -- markdown bold run or a backticked mention is painted as a clickable tag that
+    -- `<C-]>` then can't resolve.
+    local dir = nx.test.tempdir()
+    local file = dir .. "/topic.txt"
+    nx.await(nx.fs.write(
+      file,
+      table.concat({
+        "*topic*  A topic.", -- row 0: a real target
+        "", -- 1
+        "A **bold** run and a `*quoted*` mention.", -- 2: neither is a target
+        "", -- 3
+        "A real *second-tag* sits here.", -- 4: a real target
+      }, "\n")
+    ))
+    window.show({ file = file, name = "topic" })
+    local buf = t:wait_for(function()
+      return window.bufnr()
+    end)
+    local rows = t:wait_for(function()
+      local found, any = {}, false
+      for _, mk in ipairs(nx.buf.extmarks(buf, highlight.ns, 0, -1, { details = true })) do
+        if mk[4] and mk[4].hl_group == "nxHelpTag" then
+          found[mk[2]] = true
+          any = true
+        end
+      end
+      return any and found
+    end)
+    nx.test.expect(rows[0]).to_be_truthy() -- *topic*
+    nx.test.expect(rows[4]).to_be_truthy() -- *second-tag*
+    nx.test.expect(rows[2]).to_be_falsy() -- **bold** / `*quoted*`
   end)
 
   nx.test.it("marks a *target* span at its exact byte columns", function(t)

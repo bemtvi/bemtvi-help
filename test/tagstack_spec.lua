@@ -31,7 +31,7 @@ nx.test.describe("nxvim-help.tagstack follow/back", function()
   nx.test.before_each(function()
     window._reset()
     tagstack._reset()
-    index._index = nil
+    index.invalidate()
     help.setup()
   end)
 

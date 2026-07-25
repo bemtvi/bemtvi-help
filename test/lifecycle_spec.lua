@@ -22,7 +22,7 @@ end
 nx.test.describe("nxvim-help window lifecycle", function()
   nx.test.before_each(function()
     window._reset()
-    index._index = nil
+    index.invalidate()
     help.setup()
   end)
 

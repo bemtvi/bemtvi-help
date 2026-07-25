@@ -25,6 +25,50 @@ nx.test.describe("nxvim-help.helptags", function()
     nx.test.expect(table.concat(tags, ",")).to_be("intro,intro-sub,foo.bar,baz")
   end)
 
+  nx.test.it("requires a target to be whitespace-delimited, like vim", function()
+    -- vim's helptags accepts `*tag*` only when the opening `*` sits at column 1 or
+    -- after a space/tab AND the closing `*` is followed by whitespace or end-of-line
+    -- (src/nvim/help.c, helptags_one). Without those two rules every inline mention —
+    -- markdown bold, a backticked `*targets*`, a C pointer deref — became a tag, and
+    -- this plugin's OWN doc ended up shadowing generic topics like `target` and `tag`.
+    local text = table.concat({
+      "*good* opens the line",
+      "a **bold** run is not a tag",
+      "a backticked `*targets*` is not a tag",
+      "neither is a*b*c mid-token",
+      "but *trailing* ", -- followed by a space: still a tag
+      "*a|b* has a bar in it",
+      "** is empty",
+      "ends the file with *last*",
+    }, "\n")
+    nx.test.expect(table.concat(helptags.targets(text), ",")).to_be("good,trailing,last")
+  end)
+
+  nx.test.it("skips targets inside a `>` code example, like vim", function()
+    -- vim's scanner suspends tag collection inside an example: a line ending in
+    -- `>`/`>lang` opens one, and any line starting in column 1 ends it. A `*ptr*` in
+    -- sample code is code, not a tag.
+    local text = table.concat({
+      "*real-tag*  a topic",
+      "",
+      "An example: >c",
+      "  int *ptr* = 0;",
+      "  *also-code*",
+      "<*glued* is NOT a tag: the `<` is not whitespace before the star",
+      "",
+      "Another: >",
+      "  *still-code*",
+      "< *after-close* ends the block, and IS a tag",
+      "",
+      "Unclosed: >",
+      "  *also-still-code*",
+      "*column-one* ends the block and is a tag",
+    }, "\n")
+    nx.test
+      .expect(table.concat(helptags.targets(text), ","))
+      .to_be("real-tag,after-close,column-one")
+  end)
+
   nx.test.it("writes a sorted, tab-separated tags file from doc/*.txt", function()
     local dir = nx.test.tempdir()
     write(dir .. "/a.txt", "*zeta*\n*alpha*\n")
