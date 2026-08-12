@@ -1,14 +1,14 @@
--- nxvim-help.picker — fuzzy-find a help topic with nx.picker.
+-- bemtvi-help.picker — fuzzy-find a help topic with btv.picker.
 --
 -- This is the primary discovery UX: bare `:help` (no topic) opens a picker over every
 -- known tag, fuzzy-matched as you type; <CR> opens the highlighted topic. It replaces
--- vim's command-line tag completion (nxvim user commands have no completer hook) with
+-- vim's command-line tag completion (bemtvi user commands have no completer hook) with
 -- something better.
 
-local helptags = require("nxvim-help.helptags")
-local index = require("nxvim-help.index")
-local util = require("nxvim-help.util")
-local window = require("nxvim-help.window")
+local helptags = require("bemtvi-help.helptags")
+local index = require("bemtvi-help.index")
+local util = require("bemtvi-help.util")
+local window = require("bemtvi-help.window")
 
 local M = {}
 
@@ -25,7 +25,7 @@ local function rows_for(idx, file)
     cache = { idx = idx, rows = {} }
   end
   if not cache.rows[file] then
-    local ok, text = pcall(nx.await, nx.fs.read_text(file))
+    local ok, text = pcall(btv.await, btv.fs.read_text(file))
     cache.rows[file] = helptags.target_rows((ok and text) or "")
   end
   return cache.rows[file]
@@ -37,8 +37,8 @@ end
 -- drive the "location" preview (the file scrolled to the tag's anchor). Sorted for a
 -- stable list. Async: builds the index, then reads each doc file once to locate anchors.
 function M.items(ctx)
-  return nx.async(function()
-    local idx = nx.await(index.ensure())
+  return btv.async(function()
+    local idx = btv.await(index.ensure())
     local tags = {}
     for tag in pairs(idx) do
       tags[#tags + 1] = tag
@@ -55,7 +55,7 @@ function M.items(ctx)
     for _, tag in ipairs(tags) do
       local entry = idx[tag]
       ctx.push({
-        text = string.format(format, tag, nx.utils.basename(entry.file) or entry.file),
+        text = string.format(format, tag, btv.utils.basename(entry.file) or entry.file),
         entry = entry,
         path = entry.file,
         row = rows_for(idx, entry.file)[tag] or 1,
@@ -68,15 +68,15 @@ end
 -- Open the chosen topic in the help window.
 function M.confirm(item)
   util.run(function()
-    nx.await(window.show(item.entry))
+    btv.await(window.show(item.entry))
   end)
 end
 
 -- Register the source (idempotent — keyed by name; a re-require overwrites). Named
--- nxvim_help so it can't clash with a built-in source. Single-choice: `<Tab>` marking
+-- bemtvi_help so it can't clash with a built-in source. Single-choice: `<Tab>` marking
 -- a batch of topics would have nothing to act on, since confirm opens exactly one.
-nx.picker.source({
-  name = "nxvim_help",
+btv.picker.source({
+  name = "bemtvi_help",
   items = M.items,
   confirm = M.confirm,
   title = "Help Topics",
@@ -86,7 +86,7 @@ nx.picker.source({
 
 -- Open the help-topic picker.
 function M.open()
-  nx.picker.open("nxvim_help")
+  btv.picker.open("bemtvi_help")
 end
 
 return M

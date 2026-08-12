@@ -1,7 +1,7 @@
--- nxvim-help.util — the plugin-private glue every module shares.
+-- bemtvi-help.util — the plugin-private glue every module shares.
 --
--- Nothing here is help-specific enough for `nx.utils.*` (the path helpers this plugin
--- needs already live there — `nx.utils.dirname` / `nx.utils.basename`), and nothing
+-- Nothing here is help-specific enough for `btv.utils.*` (the path helpers this plugin
+-- needs already live there — `btv.utils.dirname` / `btv.utils.basename`), and nothing
 -- here belongs to one module, so it lives in one place instead of three copies.
 
 local M = {}
@@ -10,8 +10,8 @@ local M = {}
 -- unhandled promise error. Every entry point the user can trigger (`:help`, `K`, a
 -- picker confirm, a tag jump) funnels through this, so a failure is always loud.
 function M.run(body)
-  nx.async(body)():catch(function(e)
-    nx.notify("nxvim-help: " .. M.errmsg(e), 4)
+  btv.async(body)():catch(function(e)
+    btv.notify("bemtvi-help: " .. M.errmsg(e), 4)
   end)
 end
 

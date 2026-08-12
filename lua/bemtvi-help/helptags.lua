@@ -1,4 +1,4 @@
--- nxvim-help.helptags — extract *targets* from help text and (optionally) write a
+-- bemtvi-help.helptags — extract *targets* from help text and (optionally) write a
 -- vim-style `doc/tags` file, like vim's :helptags.
 --
 -- A generated `tags` file is *optional*: the index (index.lua) derives the same
@@ -6,11 +6,11 @@
 -- zero setup. Writing the file is an interop/speed convenience — vim and other tools
 -- can read it, and parsing one tab-separated file is cheaper than scanning every .txt.
 --
--- nxvim core owns `:helptags` (a stub), so this exposes generation as a Lua function
--- and the non-colliding `:NxHelptags` command instead.
+-- bemtvi core owns `:helptags` (a stub), so this exposes generation as a Lua function
+-- and the non-colliding `:BtvHelptags` command instead.
 
-local render = require("nxvim-help.render")
-local util = require("nxvim-help.util")
+local render = require("bemtvi-help.render")
+local util = require("bemtvi-help.util")
 
 local M = {}
 
@@ -113,12 +113,12 @@ local function esc(tag)
 end
 
 -- The unique doc/ directories on the runtimepath that ship help text — i.e. the dirs
--- :NxHelptags (no arg / ALL) regenerates. Derived from the `doc/*.txt` glob, so a dir
+-- :BtvHelptags (no arg / ALL) regenerates. Derived from the `doc/*.txt` glob, so a dir
 -- with only a stale tags file (no .txt) is skipped (nothing to regenerate from).
 function M.doc_dirs()
   local seen, out = {}, {}
-  for _, p in ipairs(nx.runtime_file("doc/*.txt", true) or {}) do
-    local dir = nx.utils.dirname(p)
+  for _, p in ipairs(btv.runtime_file("doc/*.txt", true) or {}) do
+    local dir = btv.utils.dirname(p)
     if not seen[dir] then
       seen[dir] = true
       out[#out + 1] = dir
@@ -134,9 +134,9 @@ end
 -- `dupes` names each offending tag ONCE (a tag repeated five times is one problem, not
 -- five), so the caller's message stays readable.
 function M.generate(dir)
-  return nx.async(function()
+  return btv.async(function()
     dir = dir:gsub("/+$", "") -- a trailing slash would write `dir//tags`
-    local entries = nx.await(nx.fs.readdir(dir))
+    local entries = btv.await(btv.fs.readdir(dir))
     local names = {}
     for _, e in ipairs(entries) do
       if e.type ~= "directory" and e.name:sub(-4) == ".txt" then
@@ -150,7 +150,7 @@ function M.generate(dir)
     local dupes = {}
     local tags = {} -- { { tag, file }, … }
     for _, name in ipairs(names) do
-      local text = nx.await(nx.fs.read_text(dir .. "/" .. name))
+      local text = btv.await(btv.fs.read_text(dir .. "/" .. name))
       for _, tag in ipairs(M.targets(text)) do
         if seen[tag] then
           if not reported[tag] then
@@ -173,7 +173,7 @@ function M.generate(dir)
       lines[#lines + 1] = t[1] .. "\t" .. t[2] .. "\t/*" .. esc(t[1]) .. "*"
     end
     local body = #lines > 0 and (table.concat(lines, "\n") .. "\n") or ""
-    nx.await(nx.fs.write(dir .. "/tags", body))
+    btv.await(btv.fs.write(dir .. "/tags", body))
     return { count = #tags, dupes = dupes, files = #names }
   end)()
 end

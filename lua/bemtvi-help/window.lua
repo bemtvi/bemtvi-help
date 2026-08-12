@@ -1,14 +1,14 @@
--- nxvim-help.window — render a resolved help entry in a read-only split.
+-- bemtvi-help.window — render a resolved help entry in a read-only split.
 --
--- The help buffer is an `nx.view` (the sanctioned read-only, mountable line surface):
+-- The help buffer is an `btv.view` (the sanctioned read-only, mountable line surface):
 -- we read the target `.txt`, set its lines, mount it in a split, and jump the cursor
 -- to the tag's `*anchor*` via `View:set_cursor` (the one sanctioned cursor write).
 -- A singleton handle is reused across `:help` calls so a second lookup reuses the
 -- same window instead of stacking splits.
 
-local highlight = require("nxvim-help.highlight")
-local render = require("nxvim-help.render")
-local util = require("nxvim-help.util")
+local highlight = require("bemtvi-help.highlight")
+local render = require("bemtvi-help.render")
+local util = require("bemtvi-help.util")
 
 local M = {}
 
@@ -32,8 +32,8 @@ end
 -- the cursor to an exact column — the tag stack passes it so `<C-t>` lands back on the
 -- precise spot a follow jumped from, not just its line. Async (reads the file).
 function M.show(entry, line, col)
-  return nx.async(function()
-    local text = nx.await(nx.fs.read_text(entry.file))
+  return btv.async(function()
+    local text = btv.await(btv.fs.read_text(entry.file))
     -- Render code fences (conceal the `>`/`>lua`/`<` markers) before display; line
     -- count is preserved so the anchor/tag-stack line addressing stays aligned.
     local rendered = render.prepare(util.split_lines(text))
@@ -47,7 +47,7 @@ function M.show(entry, line, col)
       current = nil
     end
     if not view then
-      view = nx.view.create({ name = "[Help]", filetype = "help" })
+      view = btv.view.create({ name = "[Help]", filetype = "help" })
     end
     view:set_lines(lines)
     if view:winid() then
@@ -57,16 +57,16 @@ function M.show(entry, line, col)
     end
     local target = line or anchor_line(lines, entry.name)
     view:set_cursor(target) -- focuses the view and lands on the line (column 0)
-    -- nx.view's cursor is line-granular; refine to the exact byte column when asked,
+    -- btv.view's cursor is line-granular; refine to the exact byte column when asked,
     -- via the public cursor setter (1-based row, 0-based col).
     if col and col > 0 and view:winid() then
-      nx.cursor.set({ target, col }, view:winid())
+      btv.cursor.set({ target, col }, view:winid())
     end
     current = entry
     -- Syntax highlighting (cosmetic): apply once the backing buffer exists. Don't
     -- block the show on it; surface a failure rather than swallowing it.
     highlight.apply_to_view(view, lines, rendered.code, rendered.blocks):catch(function(e)
-      nx.notify("nxvim-help: highlight failed: " .. util.errmsg(e), 4)
+      btv.notify("bemtvi-help: highlight failed: " .. util.errmsg(e), 4)
     end)
     return view
   end)()

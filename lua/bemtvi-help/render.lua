@@ -1,10 +1,10 @@
--- nxvim-help.render — turn raw help text into the lines we actually display,
+-- bemtvi-help.render — turn raw help text into the lines we actually display,
 -- concealing vim's code-fence markers the way neovim's help syntax does.
 --
 -- Vim marks a code example with a fence: a line ending in `>` (optionally `>lua`,
 -- `>vim`, … — a language tag) opens it, and a line whose first column is `<` (or the
 -- next line that starts in column 1) closes it. neovim conceals the `>` / `>lua` / `<`
--- markers so you never see them; nxvim has no conceal yet, so we do the equivalent by
+-- markers so you never see them; bemtvi has no conceal yet, so we do the equivalent by
 -- rewriting those marker characters out of the displayed text. Line COUNT is preserved
 -- (we only edit within a line, never drop one) so tag anchors and the <C-t> tag stack —
 -- which address the buffer by line/column — stay exactly aligned.

@@ -1,13 +1,13 @@
--- nxvim-help.tagstack — follow the help tag under the cursor (`<C-]>` / `<CR>`) and
+-- bemtvi-help.tagstack — follow the help tag under the cursor (`<C-]>` / `<CR>`) and
 -- return along the stack (`<C-t>`), like vim's help.
 --
 -- The stack is plain Lua state, independent of the editor's jumplist (a tag stack is
 -- a distinct concept in vim). Each follow records where it jumped from; each back pops
 -- and restores that exact position.
 
-local index = require("nxvim-help.index")
-local util = require("nxvim-help.util")
-local window = require("nxvim-help.window")
+local index = require("bemtvi-help.index")
+local util = require("bemtvi-help.util")
+local window = require("bemtvi-help.window")
 
 local M = {}
 
@@ -72,15 +72,15 @@ function M.follow()
     if not window.bufnr() then
       return
     end
-    local pos = nx.cursor.get()
-    local tag = M.tag_at(nx.current_line(), pos[2])
+    local pos = btv.cursor.get()
+    local tag = M.tag_at(btv.current_line(), pos[2])
     if not tag then
-      nx.notify("nxvim-help: no help tag under the cursor", 3)
+      btv.notify("bemtvi-help: no help tag under the cursor", 3)
       return
     end
-    local entry = index.lookup(nx.await(index.ensure()), tag)
+    local entry = index.lookup(btv.await(index.ensure()), tag)
     if not entry then
-      nx.notify('E149: Sorry, no help for "' .. tag .. '"', 4)
+      btv.notify('E149: Sorry, no help for "' .. tag .. '"', 4)
       return
     end
     local from = window.current()
@@ -92,7 +92,7 @@ function M.follow()
         table.remove(stack, 1)
       end
     end
-    nx.await(window.show(entry))
+    btv.await(window.show(entry))
   end)
 end
 
@@ -101,11 +101,11 @@ function M.back()
   run(function()
     local top = stack[#stack]
     if not top then
-      nx.notify("nxvim-help: tag stack empty", 3)
+      btv.notify("bemtvi-help: tag stack empty", 3)
       return
     end
     stack[#stack] = nil
-    nx.await(window.show(top.entry, top.line, top.col))
+    btv.await(window.show(top.entry, top.line, top.col))
   end)
 end
 

@@ -1,14 +1,14 @@
-# nxvim-help
+# bemtvi-help
 
-Vim-style **`:help`** for [nxvim](https://github.com/davidrios/nxvim) — an optional
-first-party plugin built entirely on the native `nx.*` plugin API (ADR 0002): no core
-changes, no buffer-mutation hacks. Help lives in a read-only `nx.view` split, topics
+Vim-style **`:help`** for [bemtvi](https://github.com/davidrios/bemtvi) — an optional
+first-party plugin built entirely on the native `btv.*` plugin API (ADR 0002): no core
+changes, no buffer-mutation hacks. Help lives in a read-only `btv.view` split, topics
 resolve through a tag index merged across the runtimepath, and doc files are read with
-the promise `nx.fs` API.
+the promise `btv.fs` API.
 
 ```
 :help                  fuzzy-find a topic (the picker)
-:help nxvim-help       open help for a topic  (`:h` is the abbreviation)
+:help bemtvi-help       open help for a topic  (`:h` is the abbreviation)
 <leader>fh             open the topic picker ("find help") — bare :help
 CTRL-] / <CR>          (in help) follow the tag under the cursor
 CTRL-T                 (in help) jump back along the tag stack
@@ -33,42 +33,42 @@ token-highlighted by the fence's language wherever a tree-sitter grammar is inst
 Declare it with the built-in `:Plugins` manager, then `:PluginSync`:
 
 ```lua
-nx.plugins({ { "davidrios/nxvim-help" } })
+btv.plugins({ { "davidrios/bemtvi-help" } })
 
 -- setup() is optional; pass keywordprg to map K to "help for the word under
 -- the cursor" (off by default so it leaves an LSP-hover K alone):
-require("nxvim-help").setup({ keywordprg = true })
+require("bemtvi-help").setup({ keywordprg = true })
 ```
 
 ## Documentation
 
 Full docs — commands, the topic picker, how plugins register help (and exactly what
-counts as a tag), `:NxHelptags`, topic resolution, `K`/`keywordprg`, `setup()`,
+counts as a tag), `:BtvHelptags`, topic resolution, `K`/`keywordprg`, `setup()`,
 highlighting, and code blocks — live in the help file. The same source renders both on
 GitHub and in the editor:
 
-- In editor: `:help nxvim-help`
-- On GitHub: [doc/nxvim-help.md](./doc/nxvim-help.md) (the help source)
+- In editor: `:help bemtvi-help`
+- On GitHub: [doc/bemtvi-help.md](./doc/bemtvi-help.md) (the help source)
 
 ## Development
 
-Pure-Lua [`nx.test`](https://github.com/davidrios/nxvim) specs drive a real editor over a
+Pure-Lua [`btv.test`](https://github.com/davidrios/bemtvi) specs drive a real editor over a
 temp filesystem — target extraction, tag parsing/merge/lookup, helptags generation, the
 tags-optional scan, real runtimepath discovery, fence rendering, buffer highlighting, the
 picker source, the tag stack, `setup()` option handling, and opening a topic at its
 anchor:
 
 ```sh
-nxvim --test-plugin .
+bemtvi --test-plugin .
 ```
 
 Try the runnable demo (config isolated from your real one):
 
 ```sh
-NXVIM_CONFIG=examples cargo run -p nxvim -- README.md
-# then :help nxvim-help
+BEMTVI_CONFIG=examples cargo run -p bemtvi -- README.md
+# then :help bemtvi-help
 ```
 
-The vimdoc `doc/nxvim-help.txt` is **generated** from `doc/nxvim-help.md` via
+The vimdoc `doc/bemtvi-help.txt` is **generated** from `doc/bemtvi-help.md` via
 [panvimdoc](https://github.com/kdheepak/panvimdoc): edit the `.md`, then run
 `bash scripts/gen-vimdoc.sh` (needs `pandoc` + `git`). Never edit the `.txt` by hand.
