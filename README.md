@@ -1,6 +1,6 @@
 # bemtvi-help
 
-Vim-style **`:help`** for [bemtvi](https://github.com/davidrios/bemtvi) — an optional
+Vim-style **`:help`** for [bemtvi](https://github.com/bemtvi/bemtvi) — an optional
 first-party plugin built entirely on the native `btv.*` plugin API (ADR 0002): no core
 changes, no buffer-mutation hacks. Help lives in a read-only `btv.view` split, topics
 resolve through a tag index merged across the runtimepath, and doc files are read with
@@ -33,7 +33,7 @@ token-highlighted by the fence's language wherever a tree-sitter grammar is inst
 Declare it with the built-in `:Plugins` manager, then `:PluginSync`:
 
 ```lua
-btv.plugins({ { "davidrios/bemtvi-help" } })
+btv.plugins({ { "bemtvi/bemtvi-help" } })
 
 -- setup() is optional; pass keywordprg to map K to "help for the word under
 -- the cursor" (off by default so it leaves an LSP-hover K alone):
@@ -52,7 +52,7 @@ GitHub and in the editor:
 
 ## Development
 
-Pure-Lua [`btv.test`](https://github.com/davidrios/bemtvi) specs drive a real editor over a
+Pure-Lua [`btv.test`](https://github.com/bemtvi/bemtvi) specs drive a real editor over a
 temp filesystem — target extraction, tag parsing/merge/lookup, helptags generation, the
 tags-optional scan, real runtimepath discovery, fence rendering, buffer highlighting, the
 picker source, the tag stack, `setup()` option handling, and opening a topic at its

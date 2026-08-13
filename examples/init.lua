@@ -19,7 +19,7 @@
 -- other installed plugin's doc/ is found on.
 
 -- Load the plugin straight from this repo (a local-dev spec: `dir` is never cloned).
--- A real config would instead use `{ "davidrios/bemtvi-help" }` and `:PluginSync`.
+-- A real config would instead use `{ "bemtvi/bemtvi-help" }` and `:PluginSync`.
 btv.plugins({
   {
     name = "bemtvi-help",

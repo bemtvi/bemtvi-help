@@ -2,7 +2,7 @@
 panvimdoc — run `scripts/gen-vimdoc.sh` after editing. -->
 
 Vim-style `:help` for bemtvi — an optional first-party plugin built entirely on the native
-`btv.*` plugin API ([ADR 0002](https://github.com/davidrios/bemtvi)): no core changes and no
+`btv.*` plugin API ([ADR 0002](https://github.com/bemtvi/bemtvi)): no core changes and no
 buffer-mutation hacks. Help renders in a read-only `btv.view` split, topics resolve through a
 tag index merged across the runtimepath, and doc files are read with the promise `btv.fs` API.
 

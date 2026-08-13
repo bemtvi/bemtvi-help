@@ -15,11 +15,10 @@ Table of Contents                              *bemtvi-help-table-of-contents*
 10. Notes                                                  |bemtvi-help-notes|
 
 Vim-style `:help` for bemtvi — an optional first-party plugin built entirely
-on the native `btv.*` plugin API (ADR 0002
-<https://github.com/davidrios/bemtvi>): no core changes and no buffer-mutation
-hacks. Help renders in a read-only `btv.view` split, topics resolve through a
-tag index merged across the runtimepath, and doc files are read with the
-promise `btv.fs` API.
+on the native `btv.*` plugin API (ADR 0002 <https://github.com/bemtvi/bemtvi>):
+no core changes and no buffer-mutation hacks. Help renders in a read-only
+`btv.view` split, topics resolve through a tag index merged across the
+runtimepath, and doc files are read with the promise `btv.fs` API.
 
 It works out of the box. The plugin auto-registers `:help` when it loads
 (`plugin/bemtvi-help.lua` calls `setup()`), so once it is installed `:help
