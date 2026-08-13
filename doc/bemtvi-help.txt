@@ -1,18 +1,18 @@
-*bemtvi-help.txt*                                     Vim-style :help for bemtvi
+*bemtvi-help.txt*                                   Vim-style :help for bemtvi
 
 ==============================================================================
-Table of Contents                               *bemtvi-help-table-of-contents*
+Table of Contents                              *bemtvi-help-table-of-contents*
 
-1. Commands                                              |bemtvi-help-commands|
-2. Usage                                                    |bemtvi-help-usage|
-3. The picker                                          |bemtvi-help-the-picker|
-4. Registering help                              |bemtvi-help-registering-help|
-5. Topic resolution                              |bemtvi-help-topic-resolution|
-6. Keyword lookup                                  |bemtvi-help-keyword-lookup|
-7. Setup                                                    |bemtvi-help-setup|
-8. Highlighting                                      |bemtvi-help-highlighting|
-9. Code blocks                                        |bemtvi-help-code-blocks|
-10. Notes                                                   |bemtvi-help-notes|
+1. Commands                                             |bemtvi-help-commands|
+2. Usage                                                   |bemtvi-help-usage|
+3. The picker                                         |bemtvi-help-the-picker|
+4. Registering help                             |bemtvi-help-registering-help|
+5. Topic resolution                             |bemtvi-help-topic-resolution|
+6. Keyword lookup                                 |bemtvi-help-keyword-lookup|
+7. Setup                                                   |bemtvi-help-setup|
+8. Highlighting                                     |bemtvi-help-highlighting|
+9. Code blocks                                       |bemtvi-help-code-blocks|
+10. Notes                                                  |bemtvi-help-notes|
 
 Vim-style `:help` for bemtvi — an optional first-party plugin built entirely
 on the native `btv.*` plugin API (ADR 0002
@@ -31,7 +31,7 @@ viewable when the user has installed it; the docs ship harmlessly regardless.
 
 
 ==============================================================================
-1. Commands                                              *bemtvi-help-commands*
+1. Commands                                             *bemtvi-help-commands*
 
 >
     :help {topic}     Open help for {topic} in a read-only split.
@@ -45,7 +45,7 @@ An unknown topic is a loud, vim-style `E149` (`Sorry, no help for "{topic}"`)
 
 
 ==============================================================================
-2. Usage                                                    *bemtvi-help-usage*
+2. Usage                                                   *bemtvi-help-usage*
 
 Inside a help window:
 
@@ -60,7 +60,7 @@ through `|links|` and return the way you came.
 
 
 ==============================================================================
-3. The picker                                          *bemtvi-help-the-picker*
+3. The picker                                         *bemtvi-help-the-picker*
 
 Bare `:help` opens a fuzzy-finder over every known topic (`btv.picker`) with a
 live preview — the target doc scrolled to the topic's tag. Each row shows
@@ -73,7 +73,7 @@ or disable it.
 
 
 ==============================================================================
-4. Registering help                              *bemtvi-help-registering-help*
+4. Registering help                             *bemtvi-help-registering-help*
 
 There is no registration API. Any plugin that ships a `doc/` directory is
 discovered automatically — exactly like dropping `doc/` into a neovim plugin.
@@ -112,14 +112,14 @@ generic topic `targets` for the whole runtimepath.
 
 
 ==============================================================================
-5. Topic resolution                              *bemtvi-help-topic-resolution*
+5. Topic resolution                             *bemtvi-help-topic-resolution*
 
 Lookup is exact-first, then the shortest prefix match: `:help bemtvi-help-u`
 resolves to `bemtvi-help-usage`. An unmatched topic is a loud `E149`.
 
 
 ==============================================================================
-6. Keyword lookup                                  *bemtvi-help-keyword-lookup*
+6. Keyword lookup                                 *bemtvi-help-keyword-lookup*
 
 `K` — help for the word under the cursor — is opt-in, so it leaves an
 LSP-hover `K` alone by default. Enable it with `setup({ keywordprg = true })`.
@@ -135,7 +135,7 @@ No word under the cursor is a loud no-op.
 
 
 ==============================================================================
-7. Setup                                                    *bemtvi-help-setup*
+7. Setup                                                   *bemtvi-help-setup*
 
 `setup()` is optional — the plugin auto-registers its commands on load.
 Command registration happens once, but the options are re-applied on every
@@ -158,7 +158,7 @@ could never take effect). Only maps bemtvi-help itself bound are ever removed.
 
 
 ==============================================================================
-8. Highlighting                                      *bemtvi-help-highlighting*
+8. Highlighting                                     *bemtvi-help-highlighting*
 
 The help buffer is syntax-highlighted with extmark groups linked to standard
 highlights, so a colorscheme styles it for free:
@@ -179,7 +179,7 @@ merely opens with capitals is not.
 
 
 ==============================================================================
-9. Code blocks                                        *bemtvi-help-code-blocks*
+9. Code blocks                                       *bemtvi-help-code-blocks*
 
 Vim marks an example with a fence: a line ending in `>` (optionally with a
 language, `>lua` / `>vim`) opens it, and a line starting with `<` — or any
@@ -196,15 +196,15 @@ flat code colour.
 
 
 ==============================================================================
-10. Notes                                                   *bemtvi-help-notes*
+10. Notes                                                  *bemtvi-help-notes*
 
 bemtvi-help is built on the native `btv.*` surfaces only — `btv.view` (the
 read-only split), `btv.fs` (promise reads), `btv.picker` (the topic finder),
 `btv.runtime_file` (runtimepath discovery), `btv.buf.set_extmark` (the
-highlighting), `btv.treesitter.highlight` (code-block tokens), and `btv.keymap` /
-`btv.user_command` / `btv.autocmd` (the bindings). It adds no core changes; it is
-a worked example of a substantial editor feature living entirely as an `btv.*`
-plugin.
+highlighting), `btv.treesitter.highlight` (code-block tokens), and `btv.keymap`
+/ `btv.user_command` / `btv.autocmd` (the bindings). It adds no core changes;
+it is a worked example of a substantial editor feature living entirely as an
+`btv.*` plugin.
 
 Every disk read goes through the promise filesystem, never a blocking call, and
 the tag index is built once and shared: callers that race for it (a `:help` and
