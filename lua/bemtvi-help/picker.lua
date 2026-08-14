@@ -31,11 +31,14 @@ local function rows_for(idx, file)
   return cache.rows[file]
 end
 
--- Stream every known tag as a picker item. `text` is `tag  file` — the tag padded to
--- a fixed width so the file column lines up (the matcher sees both, so you can also
--- narrow by help file); `entry` carries its index entry for confirm; `path`/`row`/`col`
--- drive the "location" preview (the file scrolled to the tag's anchor). Sorted for a
--- stable list. Async: builds the index, then reads each doc file once to locate anchors.
+-- Stream every known tag as a picker item — a TWO-COLUMN row: `head` is the tag and
+-- the body is its help file, so the widget aligns the file column itself (to the
+-- widest tag actually listed, capped at a share of the row) and keeps both columns
+-- when a row overflows. The matcher still sees the whole row, so you can narrow by
+-- help file as well as by tag. `entry` carries its index entry for confirm;
+-- `path`/`row`/`col` drive the "location" preview (the file scrolled to the tag's
+-- anchor). Sorted for a stable list. Async: builds the index, then reads each doc file
+-- once to locate anchors.
 function M.items(ctx)
   return btv.async(function()
     local idx = btv.await(index.ensure())
@@ -44,18 +47,11 @@ function M.items(ctx)
       tags[#tags + 1] = tag
     end
     table.sort(tags)
-    -- Pad the tag column to the longest tag actually present, capped at 48 so one
-    -- outlier tag can't push the file column off the right; past the cap it wraps.
-    local width = 0
-    for _, tag in ipairs(tags) do
-      width = math.max(width, #tag)
-    end
-    width = math.min(width, 48)
-    local format = "%-" .. width .. "s  %s"
     for _, tag in ipairs(tags) do
       local entry = idx[tag]
       ctx.push({
-        text = string.format(format, tag, btv.utils.basename(entry.file) or entry.file),
+        head = tag .. "  ",
+        text = btv.utils.basename(entry.file) or entry.file,
         entry = entry,
         path = entry.file,
         row = rows_for(idx, entry.file)[tag] or 1,

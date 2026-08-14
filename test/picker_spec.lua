@@ -31,9 +31,9 @@ btv.test.describe("bemtvi-help picker", function()
   btv.test.it("streams all tags as sorted items carrying their entry", function()
     local items = collect_items()
     btv.test.expect(#items >= 1).to_be_truthy()
-    local texts, found = {}, nil
+    local heads, found = {}, nil
     for _, it in ipairs(items) do
-      texts[#texts + 1] = it.text
+      heads[#heads + 1] = it.head
       if it.entry.name == "bemtvi-help-usage" then
         found = it
       end
@@ -41,12 +41,14 @@ btv.test.describe("bemtvi-help picker", function()
     -- the known topic is present and carries a resolvable entry
     btv.test.expect(found).to_be_truthy()
     btv.test.expect(found.entry.name).to_be("bemtvi-help-usage")
-    -- the display text is `tag  file`: starts with the tag, ends with the help file
-    btv.test.expect(found.text:sub(1, #"bemtvi-help-usage")).to_be("bemtvi-help-usage")
-    btv.test.expect(found.text).to_contain(found.entry.file:match("([^/]+)$"))
-    -- sorted ascending (the fixed-width tag padding preserves tag order)
-    for i = 2, #texts do
-      btv.test.expect(texts[i - 1] <= texts[i]).to_be_truthy()
+    -- a two-column row: the tag is the head the widget aligns, its help file the body.
+    -- Declared columns, not a padded string, so an over-long tag can't push the file
+    -- column off the row.
+    btv.test.expect(found.head).to_be("bemtvi-help-usage  ")
+    btv.test.expect(found.text).to_be(found.entry.file:match("([^/]+)$"))
+    -- sorted ascending
+    for i = 2, #heads do
+      btv.test.expect(heads[i - 1] <= heads[i]).to_be_truthy()
     end
     -- carries the location-preview data: path = its file, row = its anchor line
     btv.test.expect(found.path).to_be(found.entry.file)
@@ -60,7 +62,7 @@ btv.test.describe("bemtvi-help picker", function()
 
   btv.test.it("confirm opens the chosen topic in the help window", function(t)
     local idx = btv.await(index.ensure())
-    picker.confirm({ text = "bemtvi-help-usage", entry = idx["bemtvi-help-usage"] })
+    picker.confirm({ head = "bemtvi-help-usage  ", entry = idx["bemtvi-help-usage"] })
     local txt = t:wait_for(function()
       local b = window.bufnr()
       if not b then
