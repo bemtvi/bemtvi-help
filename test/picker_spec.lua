@@ -94,7 +94,7 @@ btv.test.describe("bemtvi-help picker", function()
   btv.test.it("<leader>fh opens the topic picker (help search)", function(t)
     -- setup() binds <leader>fh to the picker (bare :help). Rebind under a known
     -- leader so we can drive it, then feed the sequence.
-    vim.g.mapleader = ","
+    btv.g.mapleader = ","
     help.setup()
     t:feed(",fh")
     t:wait_for(function()

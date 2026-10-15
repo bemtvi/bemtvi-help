@@ -18,7 +18,7 @@ end
 
 btv.test.describe("bemtvi-help setup", function()
   btv.test.before_each(function()
-    vim.g.mapleader = ","
+    btv.g.mapleader = ","
   end)
 
   btv.test.after_each(function()

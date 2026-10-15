@@ -23,7 +23,7 @@
 btv.plugins({
   {
     name = "bemtvi-help",
-    dir = vim.fn.expand("<sfile>:p:h:h"), -- the repo root (this file's grandparent dir)
+    dir = btv.expand("<sfile>:p:h:h"), -- the repo root (this file's grandparent dir)
     config = function()
       -- Opt into K = help for the word under the cursor. Put the cursor on a word
       -- like "bemtvi-help-usage" (anywhere) and press K.
