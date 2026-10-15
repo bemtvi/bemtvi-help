@@ -256,7 +256,9 @@ btv.test.describe("bemtvi-help highlight", function()
     -- visible and a `\r` on every displayed line.
     local dir = btv.test.tempdir()
     local file = dir .. "/crlf.txt"
-    btv.await(btv.fs.write(file, "*crlf*  A doc.\r\n\r\nUse it: >lua\r\n  local x = 1\r\n<done\r\n"))
+    btv.await(
+      btv.fs.write(file, "*crlf*  A doc.\r\n\r\nUse it: >lua\r\n  local x = 1\r\n<done\r\n")
+    )
     window.show({ file = file, name = "crlf" })
     local buf = t:wait_for(function()
       return window.bufnr()

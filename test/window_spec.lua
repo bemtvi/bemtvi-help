@@ -76,6 +76,8 @@ btv.test.describe("bemtvi-help window", function()
 
   btv.test.it("prefix-resolves a partial topic", function(t)
     help.help("bemtvi-help-reg")
-    btv.test.expect(wait_contains(t, "bemtvi-help-registering")).to_contain("bemtvi-help-registering")
+    btv.test
+      .expect(wait_contains(t, "bemtvi-help-registering"))
+      .to_contain("bemtvi-help-registering")
   end)
 end)
