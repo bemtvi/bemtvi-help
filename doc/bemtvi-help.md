@@ -42,6 +42,16 @@ q                 Close the help window.
 Both `CTRL-]` and `<CR>` follow, matching vim. The tag stack lets you drill through `|links|`
 and return the way you came.
 
+## Modeless editing
+
+The same window keys work in a modeless session (`:set modeless`, the GUI and web editing model
+with no Normal mode). The help window rests in Insert there, refuses typing (`E21`), and binds
+`<CR>`, `CTRL-]`, `CTRL-T` and `q` in the `modeless` keymap layer as well as in Normal mode. Find
+a link with the editor's `CTRL-F`, since `/` would be typing.
+
+The two global maps stay Normal-only: `<leader>fh` and the optional `K` would take a typed space
+or `K` in every file. Open help from the command palette (`:help`) instead.
+
 # The picker
 
 Bare `:help` opens a fuzzy-finder over every known topic (`btv.picker`) with a live preview — the
