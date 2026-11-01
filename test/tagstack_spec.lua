@@ -63,6 +63,35 @@ btv.test.describe("bemtvi-help.tagstack follow/back", function()
     btv.test.expect(back.name).to_be("bemtvi-help")
   end)
 
+  -- A modeless session (`'modeless'`, GUI and web) has no Normal mode: the help window
+  -- rests in Insert, refuses typing, and takes its keys through the `modeless` layer.
+  -- Find with the layout's <C-f> (a typed `/` would be refused), then the same keys.
+  btv.test.it("follows, returns and closes with the same keys in a modeless session", function(t)
+    btv.o.modeless = true
+    help.help("bemtvi-help")
+    t:wait_for(function()
+      local c = window.current()
+      return c and c.name == "bemtvi-help"
+    end)
+    btv.test.expect(t:mode()).to_be("i")
+    t:feed("<C-f>bemtvi-help-usage<CR>")
+    t:feed("<CR>")
+    t:wait_for(function()
+      local c = window.current()
+      return c and c.name == "bemtvi-help-usage"
+    end, { message = "<CR> never followed the tag" })
+    t:feed("<C-t>")
+    t:wait_for(function()
+      local c = window.current()
+      return c and c.name == "bemtvi-help"
+    end, { message = "<C-t> never went back" })
+    local help_buf = t:buf()
+    t:feed("q")
+    t:wait_for(function()
+      return t:buf() ~= help_buf
+    end, { message = "q never closed the help window" })
+  end)
+
   btv.test.it("<C-t> restores the exact column, not just the line", function(t)
     help.help("bemtvi-help") -- front page
     t:wait_for(function()

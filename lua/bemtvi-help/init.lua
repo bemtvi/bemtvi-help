@@ -199,21 +199,24 @@ function M.setup(opts)
     M.helptags(a.args)
   end, { desc = "Generate help tags from doc/*.txt ([dir] or ALL)" })
 
-  -- Buffer-local maps for the help window, installed when a help buffer loads.
+  -- Buffer-local maps for the help window, installed when a help buffer loads. Each binds
+  -- in Normal and in the `modeless` keymap layer: a modeless session (GUI and web) has no
+  -- Normal mode, and the read-only help window takes its keys only through that layer.
+  local modes = { "n", "modeless" }
   btv.autocmd.create("FileType", {
     pattern = "help",
     callback = function()
-      btv.keymap.set("n", "q", function()
+      btv.keymap.set(modes, "q", function()
         window.close()
       end, { buffer = 0, desc = "Close help" })
       -- Follow the tag under the cursor (vim binds both <C-]> and <CR> in help)…
       for _, lhs in ipairs({ "<C-]>", "<CR>" }) do
-        btv.keymap.set("n", lhs, function()
+        btv.keymap.set(modes, lhs, function()
           tagstack.follow()
         end, { buffer = 0, desc = "Follow help tag" })
       end
       -- …and pop back along the tag stack.
-      btv.keymap.set("n", "<C-t>", function()
+      btv.keymap.set(modes, "<C-t>", function()
         tagstack.back()
       end, { buffer = 0, desc = "Back (help tag stack)" })
     end,
